@@ -137,4 +137,3 @@ async def analyze(notes: UploadFile = File(...), questions: UploadFile = File(..
 
     results = [{"question": q, "answer": answer_question(q)} for q in questions_list]
     return {"results": results}
-abcd
