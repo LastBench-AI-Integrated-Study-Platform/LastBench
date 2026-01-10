@@ -11,6 +11,8 @@ import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
+from db.connection import db
+
 load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -111,6 +113,9 @@ Answer:
 
 
 # ---------- API ----------
+@app.get("/")
+async def root():
+    return {"message": "Backend is running!"}
 
 @app.post("/analyze")
 async def analyze(notes: UploadFile = File(...), questions: UploadFile = File(...)):
