@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -40,19 +42,33 @@ class _SignupPageState extends State<SignupPage> {
     "Other",
   ];
 
-  void submitSignup() async {
-    if (!_formKey.currentState!.validate()) return;
+ void submitSignup() async {
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => isLoading = true);
+  setState(() => isLoading = true);
 
-    await Future.delayed(const Duration(seconds: 2));
+  try {
+    final msg = await AuthService.signup(
+      name: nameController.text,
+      email: emailController.text,
+      password: passwordController.text,
+      exam: selectedExam!,
+    );
 
-    setState(() => isLoading = false);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
 
-    debugPrint("Name: ${nameController.text}");
-    debugPrint("Email: ${emailController.text}");
-    debugPrint("Exam: $selectedExam");
+    Navigator.pushReplacementNamed(context, '/login');
+
+  } catch (e) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(e.toString())));
   }
+
+  setState(() => isLoading = false);
+}
+
+
 
   @override
   Widget build(BuildContext context) {

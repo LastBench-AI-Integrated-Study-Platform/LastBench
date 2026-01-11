@@ -11,7 +11,9 @@ import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
+
 from db.connection import db
+from routes.auth_routes import router as auth_router
 
 load_dotenv()
 
@@ -25,6 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(auth_router)
+
 
 vector_store = None
 documents = []

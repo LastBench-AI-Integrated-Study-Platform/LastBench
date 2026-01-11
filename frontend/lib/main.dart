@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:last_bench/signup_page.dart';
-import 'last_bench_home.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
-import 'landing_page.dart';
+import 'last_bench_home.dart';
+
 
 void main() {
-  runApp(const MyApp());
+  runApp(const LastBenchApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class LastBenchApp extends StatelessWidget {
+  const LastBenchApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: LastBenchHome(),
+      title: 'Last Bench',
+      theme: ThemeData(
+        primaryColor: const Color(0xFF033F63),
+      ),
+
+      // 👇 First screen
+      initialRoute: '/login',
+
+      routes: {
+        '/login': (context) => const LoginPage(),
+        '/signup': (context) => const SignupPage(),
+      },
     );
   }
 }
