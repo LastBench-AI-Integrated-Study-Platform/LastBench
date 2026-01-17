@@ -17,23 +17,23 @@ class _LandingPageState extends State<LandingPage> {
   final List<Map<String, String>> facts = [
     {
       "type": "Did You Know?",
-      "content": "70% of toppers revise PYQs more than new questions."
+      "content": "70% of toppers revise PYQs more than new questions.",
     },
     {
       "type": "Exam Shortcut",
-      "content": "OS Deadlock prevention = break at least 1 Coffman condition."
+      "content": "OS Deadlock prevention = break at least 1 Coffman condition.",
     },
     {
       "type": "Placement Tip",
-      "content": "HR rounds check consistency, not perfection."
+      "content": "HR rounds check consistency, not perfection.",
     },
     {
       "type": "Motivation",
-      "content": "Sitting at the last bench doesn't decide rank. Effort does."
+      "content": "Sitting at the last bench doesn't decide rank. Effort does.",
     },
     {
       "type": "Quick Fact",
-      "content": "Most asked topic in CN: Flow control & congestion."
+      "content": "Most asked topic in CN: Flow control & congestion.",
     },
   ];
 
@@ -62,15 +62,14 @@ class _LandingPageState extends State<LandingPage> {
     },
     {
       "icon": Icons.emoji_events,
-      "title": "Placement Preparation",
+      "title": "Quiz + Flashcards",
       "desc":
-          "Practice aptitude, technical questions, and interview prep.",
+          "Attach your notes to auto-generate quizzes and flashcards for revision.",
     },
     {
       "icon": Icons.lightbulb,
       "title": "Daily Exam Insights",
-      "desc":
-          "Get daily exam facts, shortcuts, and motivation.",
+      "desc": "Get daily exam facts, shortcuts, and motivation.",
     },
   ];
 
@@ -85,22 +84,16 @@ class _LandingPageState extends State<LandingPage> {
         elevation: 1,
         title: const Text(
           "Last Bench",
-          style: TextStyle(
-              color: navy, fontWeight: FontWeight.bold),
+          style: TextStyle(color: navy, fontWeight: FontWeight.bold),
         ),
         actions: [
           TextButton(
             onPressed: () {},
-            child: const Text(
-              "Login",
-              style: TextStyle(color: navy),
-            ),
+            child: const Text("Login", style: TextStyle(color: navy)),
           ),
           const SizedBox(width: 8),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: teal,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: teal),
             onPressed: () {},
             child: const Text("Sign Up"),
           ),
@@ -112,7 +105,6 @@ class _LandingPageState extends State<LandingPage> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-
             // ---------------- HERO ----------------
             Padding(
               padding: const EdgeInsets.all(24),
@@ -132,8 +124,7 @@ class _LandingPageState extends State<LandingPage> {
                   const Text(
                     "A collaborative study platform where students prepare together for exams and placements.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: Colors.black54, fontSize: 16),
+                    style: TextStyle(color: Colors.black54, fontSize: 16),
                   ),
                   const SizedBox(height: 24),
 
@@ -144,7 +135,9 @@ class _LandingPageState extends State<LandingPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: teal,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 28, vertical: 14),
+                            horizontal: 28,
+                            vertical: 14,
+                          ),
                         ),
                         onPressed: () {},
                         child: const Text("Get Started Free"),
@@ -164,8 +157,7 @@ class _LandingPageState extends State<LandingPage> {
             GestureDetector(
               onTap: () {
                 setState(() {
-                  currentFactIndex =
-                      (currentFactIndex + 1) % facts.length;
+                  currentFactIndex = (currentFactIndex + 1) % facts.length;
                 });
               },
               child: Container(
@@ -180,14 +172,12 @@ class _LandingPageState extends State<LandingPage> {
                   children: [
                     Text(
                       facts[currentFactIndex]["type"]!,
-                      style:
-                          const TextStyle(color: Colors.white70),
+                      style: const TextStyle(color: Colors.white70),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       facts[currentFactIndex]["content"]!,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ],
                 ),
@@ -203,9 +193,10 @@ class _LandingPageState extends State<LandingPage> {
                     "Everything You Need to Study Smarter",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: navy),
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: navy,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -216,44 +207,43 @@ class _LandingPageState extends State<LandingPage> {
 
                   GridView.builder(
                     shrinkWrap: true,
-                    physics:
-                        const NeverScrollableScrollPhysics(),
+                    physics: const NeverScrollableScrollPhysics(),
                     itemCount: features.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.35,
-                    ),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 1.35,
+                        ),
                     itemBuilder: (context, index) {
                       final f = features[index];
                       return Card(
                         elevation: 2,
                         shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(16)),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(f["icon"],
-                                  size: 32, color: teal),
+                              Icon(f["icon"], size: 32, color: teal),
                               const SizedBox(height: 12),
                               Text(
                                 f["title"],
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: navy),
+                                  fontWeight: FontWeight.bold,
+                                  color: navy,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 f["desc"],
                                 style: const TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 13),
+                                  color: Colors.black54,
+                                  fontSize: 13,
+                                ),
                               ),
                             ],
                           ),
@@ -275,9 +265,10 @@ class _LandingPageState extends State<LandingPage> {
                   Text(
                     "Last Bench",
                     style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   SizedBox(height: 8),
                   Text(
@@ -287,8 +278,7 @@ class _LandingPageState extends State<LandingPage> {
                   SizedBox(height: 16),
                   Text(
                     "© 2025 Last Bench. All rights reserved.",
-                    style: TextStyle(
-                        color: Colors.white54, fontSize: 12),
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ],
               ),

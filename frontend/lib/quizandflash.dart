@@ -1,7 +1,19 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'config.dart';
 
 class QuizAndFlashScreen extends StatefulWidget {
-  const QuizAndFlashScreen({Key? key}) : super(key: key);
+  final String sessionId;
+  final Map<String, dynamic> quiz;
+  final Map<String, dynamic> flashcards;
+
+  const QuizAndFlashScreen({
+    Key? key,
+    required this.sessionId,
+    required this.quiz,
+    required this.flashcards,
+  }) : super(key: key);
 
   @override
   State<QuizAndFlashScreen> createState() => _QuizAndFlashScreenState();
@@ -126,7 +138,16 @@ class _QuizAndFlashScreenState extends State<QuizAndFlashScreen>
                     height: 650,
                     child: TabBarView(
                       controller: _tabController,
-                      children: const [QuizSection(), FlashcardsSection()],
+                      children: [
+                        QuizSection(
+                          sessionId: widget.sessionId,
+                          quizData: widget.quiz,
+                        ),
+                        FlashcardsSection(
+                          sessionId: widget.sessionId,
+                          flashcardsData: widget.flashcards,
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -140,41 +161,57 @@ class _QuizAndFlashScreenState extends State<QuizAndFlashScreen>
 }
 
 // Quiz Section
+// Fixed Quiz Section - Replace the QuizSection class in quizandflash.dart
+
 class QuizSection extends StatefulWidget {
-  const QuizSection({Key? key}) : super(key: key);
+  final String sessionId;
+  final Map<String, dynamic> quizData;
+
+  const QuizSection({Key? key, required this.sessionId, required this.quizData})
+    : super(key: key);
 
   @override
   State<QuizSection> createState() => _QuizSectionState();
 }
 
 class _QuizSectionState extends State<QuizSection> {
-  final List<Map<String, dynamic>> quizQuestions = [
-    {
-      'id': 1,
-      'question': 'What is the capital of France?',
-      'options': ['London', 'Berlin', 'Paris', 'Madrid'],
-      'correctAnswer': 2,
-    },
-    {
-      'id': 2,
-      'question': 'Which planet is known as the Red Planet?',
-      'options': ['Venus', 'Mars', 'Jupiter', 'Saturn'],
-      'correctAnswer': 1,
-    },
-    {
-      'id': 3,
-      'question': 'What is 2 + 2?',
-      'options': ['3', '4', '5', '6'],
-      'correctAnswer': 1,
-    },
-  ];
-
+  late List<Map<String, dynamic>> quizQuestions;
   int currentQuestion = 0;
   int? selectedAnswer;
   bool isAnswered = false;
   int score = 0;
   bool quizComplete = false;
   List<Map<String, dynamic>> results = [];
+
+  @override
+  void initState() {
+    super.initState();
+    quizQuestions = _parseQuizData();
+  }
+
+  List<Map<String, dynamic>> _parseQuizData() {
+    final questions = widget.quizData['questions'] as List? ?? [];
+    return questions.map((q) {
+      // FIXED: Handle correct_answer properly
+      var correctAnswer = q['correct_answer'];
+
+      // If correct_answer is an integer (index), keep it as is
+      // If it's a string, find its index in options
+      if (correctAnswer is String) {
+        final options = (q['options'] as List?)?.cast<String>() ?? [];
+        correctAnswer = options.indexOf(correctAnswer);
+        if (correctAnswer == -1) correctAnswer = 0; // Fallback
+      }
+
+      return {
+        'id': q['id'] ?? 0,
+        'question': q['question'] ?? '',
+        'options': (q['options'] as List?)?.cast<String>() ?? [],
+        'correct_answer': correctAnswer, // Now always an index (int)
+        'explanation': q['explanation'] ?? '',
+      };
+    }).toList();
+  }
 
   void handleAnswerSelect(int index) {
     if (isAnswered) return;
@@ -185,20 +222,23 @@ class _QuizSectionState extends State<QuizSection> {
 
   void handleSubmit() {
     if (selectedAnswer == null) return;
+
+    final question = quizQuestions[currentQuestion];
+
+    // FIXED: Compare indices, not strings
+    final correctAnswerIndex = question['correct_answer'] as int;
+    final isCorrect = selectedAnswer == correctAnswerIndex;
+
     setState(() {
       isAnswered = true;
-      final isCorrect =
-          selectedAnswer == quizQuestions[currentQuestion]['correctAnswer'];
       if (isCorrect) {
         score++;
       }
-      // Store result
       results.add({
-        'question': quizQuestions[currentQuestion]['question'],
-        'selectedAnswer':
-            quizQuestions[currentQuestion]['options'][selectedAnswer!],
+        'question': question['question'],
+        'selectedAnswer': question['options'][selectedAnswer!],
         'correctAnswer':
-            quizQuestions[currentQuestion]['options'][quizQuestions[currentQuestion]['correctAnswer']],
+            question['options'][correctAnswerIndex], // Get the actual text
         'isCorrect': isCorrect,
       });
     });
@@ -215,6 +255,7 @@ class _QuizSectionState extends State<QuizSection> {
       setState(() {
         quizComplete = true;
       });
+      _submitQuizAttempt();
     }
   }
 
@@ -227,6 +268,42 @@ class _QuizSectionState extends State<QuizSection> {
       quizComplete = false;
       results = [];
     });
+  }
+
+  Future<void> _submitQuizAttempt() async {
+    try {
+      final answers = results.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final r = entry.value;
+        return {
+          'question_id': idx,
+          'question': r['question'],
+          'user_answer': r['selectedAnswer'],
+          'correct_answer': r['correctAnswer'],
+          'is_correct': r['isCorrect'],
+          'options': quizQuestions[idx]['options'],
+        };
+      }).toList();
+
+      final response = await http.post(
+        Uri.parse(AppConfig.quizAttemptEndpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'session_id': widget.sessionId,
+          'answers': answers,
+          'score': score,
+          'total_questions': quizQuestions.length,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('Quiz attempt saved successfully');
+      } else {
+        print('Failed to save quiz attempt: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error submitting quiz: $e');
+    }
   }
 
   @override
@@ -475,6 +552,7 @@ class _QuizSectionState extends State<QuizSection> {
 
     final question = quizQuestions[currentQuestion];
     final options = question['options'] as List<String>;
+    final correctAnswerIndex = question['correct_answer'] as int;
 
     return Container(
       decoration: BoxDecoration(
@@ -552,7 +630,9 @@ class _QuizSectionState extends State<QuizSection> {
               itemCount: options.length,
               itemBuilder: (context, index) {
                 final isSelected = selectedAnswer == index;
-                final isCorrect = index == question['correctAnswer'];
+                final isCorrect =
+                    index ==
+                    correctAnswerIndex; // FIXED: Now comparing int with int
                 final showResult = isAnswered;
 
                 Color bgColor = Colors.white;
@@ -560,17 +640,22 @@ class _QuizSectionState extends State<QuizSection> {
                 Color textColor = const Color(0xFF0F172A);
 
                 if (showResult && isCorrect) {
+                  // FIXED: Always show correct answer in green
                   bgColor = const Color(0xFF379392);
                   borderColor = const Color(0xFF379392);
                   textColor = Colors.white;
                 } else if (showResult && isSelected && !isCorrect) {
+                  // FIXED: Show wrong answer in red
                   bgColor = const Color(0xFFEF4444).withOpacity(0.1);
                   borderColor = const Color(0xFFEF4444);
                   textColor = const Color(0xFFEF4444);
                 } else if (showResult) {
+                  // Other options fade out
                   bgColor = const Color(0xFFF5F5F6).withOpacity(0.5);
                   borderColor = const Color(0xFFE2E8F0);
+                  textColor = const Color(0xFF94A3B8);
                 } else if (isSelected) {
+                  // Before submitting, show selection
                   bgColor = const Color(0xFF379392).withOpacity(0.1);
                   borderColor = const Color(0xFF379392);
                 }
@@ -641,9 +726,9 @@ class _QuizSectionState extends State<QuizSection> {
               ),
               child: Text(
                 isAnswered
-                    ? (currentQuestion < quizQuestions.length - 1
-                          ? 'Next Question'
-                          : 'View Results')
+                    ? (currentQuestion == quizQuestions.length - 1
+                          ? 'Submit Quiz'
+                          : 'Next Question')
                     : 'Submit Answer',
                 style: const TextStyle(
                   fontSize: 16,
@@ -660,42 +745,41 @@ class _QuizSectionState extends State<QuizSection> {
 
 // Flashcards Section
 class FlashcardsSection extends StatefulWidget {
-  const FlashcardsSection({Key? key}) : super(key: key);
+  final String sessionId;
+  final Map<String, dynamic> flashcardsData;
+
+  const FlashcardsSection({
+    Key? key,
+    required this.sessionId,
+    required this.flashcardsData,
+  }) : super(key: key);
 
   @override
   State<FlashcardsSection> createState() => _FlashcardsSectionState();
 }
 
 class _FlashcardsSectionState extends State<FlashcardsSection> {
-  final List<Map<String, dynamic>> flashcards = [
-    {
-      'id': 1,
-      'front': 'What is React?',
-      'back':
-          'A JavaScript library for building user interfaces, maintained by Meta and a community of developers.',
-    },
-    {
-      'id': 2,
-      'front': 'What is Next.js?',
-      'back':
-          'A React framework for building full-stack web applications with features like server-side rendering and file-based routing.',
-    },
-    {
-      'id': 3,
-      'front': 'What is TypeScript?',
-      'back':
-          'A strongly typed programming language that builds on JavaScript, giving you better tooling at any scale.',
-    },
-    {
-      'id': 4,
-      'front': 'What is Tailwind CSS?',
-      'back':
-          'A utility-first CSS framework that provides low-level utility classes to build custom designs.',
-    },
-  ];
-
+  late List<Map<String, dynamic>> flashcards;
   int currentCard = 0;
   bool isFlipped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    flashcards = _parseFlashcardsData();
+  }
+
+  List<Map<String, dynamic>> _parseFlashcardsData() {
+    final cards = widget.flashcardsData['cards'] as List? ?? [];
+    return cards.map((c) {
+      return {
+        'id': c['id'] ?? 0,
+        'question': c['question'] ?? '',
+        'answer': c['answer'] ?? '',
+        'card_order': c['card_order'] ?? 0,
+      };
+    }).toList();
+  }
 
   void handleFlip() {
     setState(() {
@@ -726,6 +810,18 @@ class _FlashcardsSectionState extends State<FlashcardsSection> {
       currentCard = 0;
       isFlipped = false;
     });
+  }
+
+  Future<void> _saveCardProgress(bool isKnown) async {
+    try {
+      await http.post(
+        Uri.parse(
+          '${AppConfig.flashcardProgressEndpoint}?session_id=${widget.sessionId}&card_id=${flashcards[currentCard]['id']}&is_known=$isKnown',
+        ),
+      );
+    } catch (e) {
+      print('Error saving flashcard progress: $e');
+    }
   }
 
   @override
@@ -816,12 +912,11 @@ class _FlashcardsSectionState extends State<FlashcardsSection> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Main content with flexible height & proper wrapping
                     Expanded(
                       child: Center(
                         child: SingleChildScrollView(
                           child: Text(
-                            isFlipped ? card['back'] : card['front'],
+                            isFlipped ? card['answer'] : card['question'],
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w700,

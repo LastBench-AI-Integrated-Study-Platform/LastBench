@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'ask_from_pdf_page.dart';
+import 'upload_file_page.dart';
 
 class LastBenchHome extends StatefulWidget {
   const LastBenchHome({super.key});
@@ -19,23 +20,24 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   final List<Map<String, String>> facts = [
     {
       "type": "Did You Know?",
-      "content": "70% of toppers revise PYQs more than new questions."
+      "content": "70% of toppers revise PYQs more than new questions.",
     },
     {
       "type": "Exam Shortcut",
-      "content": "OS Deadlock prevention = break at least 1 Coffman condition."
+      "content": "OS Deadlock prevention = break at least 1 Coffman condition.",
     },
     {
       "type": "Placement Tip",
-      "content": "HR rounds check consistency, not perfection."
+      "content": "HR rounds check consistency, not perfection.",
     },
     {
       "type": "Motivation",
-      "content": "Sitting at the last bench doesn't decide rank. Effort does 🔥"
+      "content":
+          "Sitting at the last bench doesn't decide rank. Effort does 🔥",
     },
     {
       "type": "Quick Fact",
-      "content": "Most asked topic in CN: Flow control & congestion."
+      "content": "Most asked topic in CN: Flow control & congestion.",
     },
   ];
 
@@ -45,31 +47,31 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       "icon": Icons.menu_book,
       "title": "Ask from PDF",
       "subtitle": "Previous year Qs, notes",
-      "color": teal
+      "color": teal,
     },
     {
       "icon": Icons.chat,
       "title": "Chat with Group",
       "badge": "4",
-      "color": navy
+      "color": navy,
     },
     {
       "icon": Icons.phone,
       "title": "Join Study Call",
       "status": "3 friends studying now",
-      "color": teal
+      "color": teal,
     },
     {
       "icon": Icons.help_outline,
       "title": "Ask a Doubt",
       "subtitle": "Get help from mentors",
-      "color": navy
+      "color": navy,
     },
     {
       "icon": Icons.code,
-      "title": "Placement Prep",
+      "title": "Quiz cards + Flashcards",
       "badge": "New",
-      "color": teal
+      "color": teal,
     },
   ];
 
@@ -79,19 +81,19 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       "name": "Last Bench - OS Revision",
       "exam": "GATE 2025",
       "active": 6,
-      "status": "Live"
+      "status": "Live",
     },
     {
       "name": "Java Placement Prep",
       "exam": "TCS Ninja",
       "active": 12,
-      "status": "Live"
+      "status": "Live",
     },
     {
       "name": "CAT Quant Marathon",
       "exam": "CAT 2025",
       "active": 8,
-      "status": "Starting in 10 mins"
+      "status": "Starting in 10 mins",
     },
   ];
 
@@ -110,7 +112,6 @@ class _LastBenchHomeState extends State<LastBenchHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // Greeting
             Container(
               width: double.infinity,
@@ -134,8 +135,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                   ),
                   const SizedBox(height: 14),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -144,16 +147,15 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: const [
-                        Icon(Icons.local_fire_department,
-                            color: Colors.orange),
+                        Icon(Icons.local_fire_department, color: Colors.orange),
                         SizedBox(width: 6),
                         Text(
                           "4-day study streak",
                           style: TextStyle(color: Colors.white),
-                        )
+                        ),
                       ],
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -164,9 +166,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               child: Text(
                 "Quick Actions",
                 style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: navy),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: navy,
+                ),
               ),
             ),
             SingleChildScrollView(
@@ -187,8 +190,17 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                               builder: (context) => UploadScreen(),
                             ),
                           );
+                        } else if (action["title"] ==
+                            "Quiz cards + Flashcards") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const UploadFileScreen(),
+                            ),
+                          );
                         }
                       },
+
                       child: Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -206,7 +218,9 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                               Text(
                                 action["title"],
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               if (action["subtitle"] != null)
                                 Text(
@@ -217,7 +231,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                               if (action["status"] != null)
                                 Text(
                                   action["status"],
-                                  style: const TextStyle(fontSize: 12, color: teal),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: teal,
+                                  ),
                                 ),
                             ],
                           ),
@@ -225,7 +242,6 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                       ),
                     ),
                   );
-
                 }).toList(),
               ),
             ),
@@ -234,8 +250,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
             GestureDetector(
               onTap: () {
                 setState(() {
-                  currentFactIndex =
-                      (currentFactIndex + 1) % facts.length;
+                  currentFactIndex = (currentFactIndex + 1) % facts.length;
                 });
               },
               child: Container(
@@ -250,14 +265,12 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                   children: [
                     Text(
                       facts[currentFactIndex]["type"]!,
-                      style:
-                          const TextStyle(color: Colors.white70),
+                      style: const TextStyle(color: Colors.white70),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       facts[currentFactIndex]["content"]!,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ],
                 ),
@@ -273,16 +286,18 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                   Text(
                     "Study Rooms",
                     style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: navy),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: navy,
+                    ),
                   ),
                   Text(
                     "View all",
                     style: TextStyle(
-                        fontSize: 14,
-                        color: teal,
-                        fontWeight: FontWeight.w500),
+                      fontSize: 14,
+                      color: teal,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -307,8 +322,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                           children: [
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
@@ -316,33 +330,31 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                                         child: Text(
                                           room["name"],
                                           style: const TextStyle(
-                                              fontWeight:
-                                                  FontWeight.bold),
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                      if (room["status"] ==
-                                          "Live")
+                                      if (room["status"] == "Live")
                                         Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 2),
-                                          decoration:
-                                              BoxDecoration(
-                                            color: Colors.green
-                                                .withOpacity(0.15),
-                                            borderRadius:
-                                                BorderRadius
-                                                    .circular(12),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withOpacity(
+                                              0.15,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           child: const Text(
                                             "Live",
                                             style: TextStyle(
-                                                color:
-                                                    Colors.green,
-                                                fontSize: 12,
-                                                fontWeight:
-                                                    FontWeight.bold),
+                                              color: Colors.green,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                     ],
@@ -351,24 +363,25 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                                   Text(
                                     room["exam"],
                                     style: const TextStyle(
-                                        fontSize: 12,
-                                        color:
-                                            Colors.black54),
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
                                   Row(
                                     children: [
-                                      const Icon(Icons.people,
-                                          size: 14,
-                                          color:
-                                              Colors.black45),
+                                      const Icon(
+                                        Icons.people,
+                                        size: 14,
+                                        color: Colors.black45,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text(
                                         "${room["active"]} studying",
                                         style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors
-                                                .black45),
+                                          fontSize: 12,
+                                          color: Colors.black45,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -376,14 +389,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                               ),
                             ),
                             ElevatedButton(
-                              style:
-                                  ElevatedButton.styleFrom(
+                              style: ElevatedButton.styleFrom(
                                 backgroundColor: teal,
-                                shape:
-                                    RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(
-                                          20),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                               ),
                               onPressed: () {},

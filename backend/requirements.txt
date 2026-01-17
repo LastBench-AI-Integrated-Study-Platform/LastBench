@@ -10,3 +10,7 @@ numpy
 python-multipart
 pillow
 python-dotenv
+torch
+transformers
+pytesseract
+accelerate

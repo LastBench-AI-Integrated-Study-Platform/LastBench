@@ -1,6 +1,8 @@
 import os
+
 os.environ["GRPC_DNS_RESOLVER"] = "native"
 
+from routes import combined_routes
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import shutil, numpy as np
@@ -137,3 +139,5 @@ async def analyze(notes: UploadFile = File(...), questions: UploadFile = File(..
 
     results = [{"question": q, "answer": answer_question(q)} for q in questions_list]
     return {"results": results}
+
+app.include_router(combined_routes.router, prefix="/api")
