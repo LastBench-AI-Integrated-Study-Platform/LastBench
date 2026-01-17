@@ -6,6 +6,7 @@ load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
-db = client.get_database()  # gets DB from URI
+# Use lowercase database name to match existing MongoDB instance
+db = client["lastbench"]
 
 print("MongoDB connected")

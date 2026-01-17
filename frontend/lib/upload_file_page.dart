@@ -453,13 +453,6 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
                         fileName: pdfName,
                         onTap: pickPdf,
                       ),
-                      uploadCard(
-                        title: "Upload Image",
-                        subtitle: "Upload an image of notes or questions",
-                        color: teal,
-                        fileName: imageName,
-                        onTap: pickImage,
-                      ),
                     ],
                   ),
                 ),
@@ -544,31 +537,6 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
                             ),
                           ),
                         ),
-
-                      ElevatedButton(
-                        onPressed: null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: navy,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 36,
-                            vertical: 14,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(color: Colors.black12),
-                          ),
-                        ),
-                        child: const Text(
-                          "Analyze (Coming Soon)",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            height: 2,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),

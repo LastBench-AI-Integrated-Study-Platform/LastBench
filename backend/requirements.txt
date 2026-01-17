@@ -14,3 +14,4 @@ torch
 transformers
 pytesseract
 accelerate
+python-docx

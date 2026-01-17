@@ -2,6 +2,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from bson.objectid import ObjectId
+from db.connection import db
 from services.combined_services import (
     extract_text_from_pdf,
     extract_text_from_image,
@@ -12,10 +14,10 @@ from services.combined_services import (
 
 router = APIRouter()
 
-# In-memory storage
-quiz_sessions = {}
-flashcard_sessions = {}
-quiz_attempts = {}
+# MongoDB collections
+quiz_sessions_collection = db["quiz_sessions"]
+flashcard_sessions_collection = db["flashcard_sessions"]
+quiz_attempts_collection = db["quiz_attempts"]
 
 
 # ============================================================================
@@ -127,18 +129,22 @@ async def upload_and_generate(
                 "card_order": idx
             })
         
-        # Store sessions
-        quiz_sessions[session_id] = {
+        # Store sessions in MongoDB
+        quiz_session_doc = {
+            "session_id": session_id,
             "questions": processed_quiz,
             "text": final_text,
             "created_at": datetime.now().isoformat()
         }
+        quiz_sessions_collection.insert_one(quiz_session_doc)
         
-        flashcard_sessions[session_id] = {
+        flashcard_session_doc = {
+            "session_id": session_id,
             "cards": processed_flashcards,
             "text": final_text,
             "created_at": datetime.now().isoformat()
         }
+        flashcard_sessions_collection.insert_one(flashcard_session_doc)
         
         print(f"✅ Generation complete! Session ID: {session_id}")
         
@@ -187,23 +193,29 @@ async def upload(file: UploadFile = File(...)):
 
 @router.get("/quiz/{session_id}")
 def get_quiz(session_id: str):
-    if session_id not in quiz_sessions:
+    session = quiz_sessions_collection.find_one({"session_id": session_id})
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
+    # Remove MongoDB's _id field from response
+    session.pop("_id", None)
     return {
         "session_id": session_id,
-        "quiz": quiz_sessions[session_id]
+        "quiz": session
     }
 
 
 @router.post("/quiz/attempt")
 def submit_quiz_attempt(attempt: QuizAttemptRequest):
-    if attempt.session_id not in quiz_sessions:
+    # Verify session exists
+    session = quiz_sessions_collection.find_one({"session_id": attempt.session_id})
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
     attempt_id = str(datetime.now().timestamp()).replace(".", "")
     
-    quiz_attempts[attempt_id] = {
+    attempt_doc = {
+        "attempt_id": attempt_id,
         "session_id": attempt.session_id,
         "answers": [answer.dict() for answer in attempt.answers],
         "score": attempt.score,
@@ -215,21 +227,26 @@ def submit_quiz_attempt(attempt: QuizAttemptRequest):
         "submitted_at": datetime.now().isoformat()
     }
     
+    quiz_attempts_collection.insert_one(attempt_doc)
+    
     return {
         "attempt_id": attempt_id,
         "score": attempt.score,
         "total_questions": attempt.total_questions,
-        "accuracy": quiz_attempts[attempt_id]["accuracy"],
+        "accuracy": attempt_doc["accuracy"],
         "message": "Quiz attempt saved successfully"
     }
 
 
 @router.get("/quiz/attempt/{attempt_id}")
 def get_quiz_attempt(attempt_id: str):
-    if attempt_id not in quiz_attempts:
+    attempt = quiz_attempts_collection.find_one({"attempt_id": attempt_id})
+    if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
     
-    return quiz_attempts[attempt_id]
+    # Remove MongoDB's _id field from response
+    attempt.pop("_id", None)
+    return attempt
 
 
 @router.post("/quiz")
@@ -243,27 +260,39 @@ def quiz(req: GenerateRequest):
 
 @router.get("/flashcards/{session_id}")
 def get_flashcards(session_id: str):
-    if session_id not in flashcard_sessions:
+    session = flashcard_sessions_collection.find_one({"session_id": session_id})
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
+    # Remove MongoDB's _id field from response
+    session.pop("_id", None)
     return {
         "session_id": session_id,
-        "flashcards": flashcard_sessions[session_id]
+        "flashcards": session
     }
 
 
 @router.post("/flashcards/progress")
 def save_flashcard_progress(session_id: str, card_id: int, is_known: bool):
-    if session_id not in flashcard_sessions:
+    session = flashcard_sessions_collection.find_one({"session_id": session_id})
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    if "progress" not in flashcard_sessions[session_id]:
-        flashcard_sessions[session_id]["progress"] = {}
-    
-    flashcard_sessions[session_id]["progress"][str(card_id)] = {
+    # Update or create progress tracking in MongoDB
+    progress_data = {
         "is_known": is_known,
         "studied_at": datetime.now().isoformat()
     }
+    
+    flashcard_sessions_collection.update_one(
+        {"session_id": session_id},
+        {
+            "$set": {
+                f"progress.{str(card_id)}": progress_data
+            }
+        },
+        upsert=True
+    )
     
     return {"message": "Progress saved successfully"}
 
