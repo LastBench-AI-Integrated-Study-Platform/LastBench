@@ -49,53 +49,131 @@ class _UploadScreenState extends State<UploadScreen> {
   bool get canAnalyze =>
     questionsPdfBytes != null && notesPdfBytes != null;
 
+   Future<void> analyzePdfs() async {
+  if (!canAnalyze) return;
 
-Future<void> analyzePdfs() async {
-  setState(() => uploadProgress = 0);
+  final BuildContext uploadContext = context;
 
-  final uri = Uri.parse("http://localhost:8000/analyze");
-  final request = http.MultipartRequest("POST", uri);
-
-  request.files.add(
-    http.MultipartFile.fromBytes(
-      "notes",
-      notesPdfBytes!,
-      filename: notesPdfName,
-      contentType: MediaType("application", "pdf"),
+  showDialog(
+    context: uploadContext,
+    barrierDismissible: false,
+    builder: (dialogCtx) => WillPopScope(
+      onWillPop: () async => false,
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: navy),
+              const SizedBox(height: 24),
+              const Text("Uploading & Analyzing...", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: navy)),
+              const SizedBox(height: 12),
+              const Text("Please wait...", style: TextStyle(color: Colors.grey, fontSize: 14)),
+              const SizedBox(height: 16),
+              if (uploadProgress > 0 && uploadProgress < 1) ...[
+                LinearProgressIndicator(value: uploadProgress, color: teal),
+                const SizedBox(height: 8),
+                Text("${(uploadProgress * 100).toStringAsFixed(0)}%"),
+              ],
+            ],
+          ),
+        ),
+      ),
     ),
   );
 
-  request.files.add(
-    http.MultipartFile.fromBytes(
-      "questions",
-      questionsPdfBytes!,
-      filename: questionsPdfName,
-      contentType: MediaType("application", "pdf"),
-    ),
-  );
+  setState(() => uploadProgress = 0.0);
 
-  final streamedResponse = await request.send();
+  try {
+    final uri = Uri.parse("http://127.0.0.1:8000/analyze");
+    final request = http.MultipartRequest('POST', uri);
 
-  final total = streamedResponse.contentLength ?? 1;
-  int received = 0;
+    request.files.add(http.MultipartFile.fromBytes('notes', notesPdfBytes!, filename: notesPdfName, contentType: MediaType('application', 'pdf')));
+    request.files.add(http.MultipartFile.fromBytes('questions', questionsPdfBytes!, filename: questionsPdfName, contentType: MediaType('application', 'pdf')));
 
-  streamedResponse.stream.listen(
-    (chunk) {
-      received += chunk.length;
+    final streamedResponse = await request.send();
+
+    int received = 0;
+    final total = streamedResponse.contentLength ?? 1;
+
+    
+
+    final response = await http.Response.fromStream(streamedResponse);
+
+    // Always try to close dialog
+    if (mounted && Navigator.canPop(uploadContext)) {
+      Navigator.of(uploadContext, rootNavigator: true).pop();
+    }
+
+    if (response.statusCode != 200) {
+      throw Exception("Server error: ${response.statusCode} – ${response.body.substring(0, 200)}...");
+    }
+
+    // ── Safe JSON parsing ────────────────────────────────────────────────
+    String body = response.body.trim();
+    print("Raw response length: ${body.length} chars"); // Debug
+    print("First 200 chars: ${body.substring(0, body.length > 200 ? 200 : body.length)}");
+
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(body) as Map<String, dynamic>;
+    } catch (e) {
+      print("JSON decode failed: $e");
+      throw Exception("Invalid response format from server (not valid JSON): $e");
+    }
+
+    final rawResults = data['results'];
+    List<dynamic> results = [];
+
+    if (rawResults is List) {
+      results = rawResults;
+    } else if (rawResults != null) {
+      print("Warning: 'results' key is not a List – type: ${rawResults.runtimeType}");
+    }
+
+    print("Parsed ${results.length} results successfully");
+
+    if (mounted) {
+      Navigator.push(
+        uploadContext,
+        MaterialPageRoute(builder: (_) => ResultsScreen(results: results.cast<Map<String, dynamic>>())),
+      );
+
       setState(() {
-        uploadProgress = received / total;
+        questionsPdfBytes = null;
+        notesPdfBytes = null;
+        questionsPdfName = null;
+        notesPdfName = null;
+        uploadProgress = 0;
       });
-    },
-    onDone: () async {
-      final response =
-          await http.Response.fromStream(streamedResponse);
-      final data = jsonDecode(response.body);
-      print(data);
-    },
-  );
+    }
+
+  } catch (e, stackTrace) {
+    print("Full error in analyzePdfs: $e");
+    print(stackTrace);
+
+    if (mounted && Navigator.canPop(uploadContext)) {
+      Navigator.of(uploadContext, rootNavigator: true).pop();
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(uploadContext).showSnackBar(
+        SnackBar(
+          content: Text("Analysis failed: ${e.toString().split('\n').first}"),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
+  }
 }
-
-
 @override
 Widget build(BuildContext context) {
   return Scaffold(
@@ -345,6 +423,81 @@ Widget build(BuildContext context) {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+class ResultsScreen extends StatelessWidget {
+  final List<dynamic> results;
+
+  const ResultsScreen({super.key, required this.results});
+
+  @override
+  Widget build(BuildContext context) {
+    const navy = Color(0xFF033F63);
+    const teal = Color(0xFF379392);
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: navy,
+        foregroundColor: Colors.white,
+        title: const Text("Analysis Results"),
+        centerTitle: true,
+      ),
+      body: results.isEmpty
+          ? const Center(
+              child: Text(
+                "No results found",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: results.length,
+              itemBuilder: (context, index) {
+                final item = results[index] as Map<String, dynamic>;
+                final question = item['question'] as String? ?? "Missing question";
+                final answer = item['answer'] as String? ?? "No answer available";
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "${index + 1}. $question",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: navy,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          answer,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.5,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: teal,
+        onPressed: () => Navigator.pop(context),
+        child: const Icon(Icons.arrow_back, color: Colors.white),
       ),
     );
   }
