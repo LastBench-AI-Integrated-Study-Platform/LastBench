@@ -300,3 +300,79 @@ def save_flashcard_progress(session_id: str, card_id: int, is_known: bool):
 @router.post("/flashcards")
 def flashcards(req: GenerateRequest):
     return generate_flashcards(req.text, req.count)
+
+
+# ============================================================================
+# HISTORY ENDPOINTS
+# ============================================================================
+
+@router.get("/upload/sessions/history")
+def get_sessions_history():
+    """Retrieve all quiz sessions with their creation time for history view."""
+    try:
+        # Use aggregation pipeline to properly handle text truncation
+        pipeline = [
+            {
+                "$project": {
+                    "session_id": 1,
+                    "created_at": 1,
+                    "text": {
+                        "$substr": ["$text", 0, 100]
+                    },
+                    "_id": 0
+                }
+            },
+            {
+                "$sort": {
+                    "created_at": -1
+                }
+            }
+        ]
+        
+        sessions = list(quiz_sessions_collection.aggregate(pipeline))
+        
+        print(f"✅ Retrieved {len(sessions)} sessions from history")
+        
+        return {
+            "sessions": sessions,
+            "total": len(sessions)
+        }
+    except Exception as e:
+        print(f"❌ Error retrieving sessions: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving sessions: {str(e)}"
+        )
+
+
+@router.get("/upload/sessions/{session_id}/full")
+def get_session_full_details(session_id: str):
+    """Retrieve complete session details including quiz and flashcards."""
+    try:
+        quiz_session = quiz_sessions_collection.find_one({"session_id": session_id})
+        flashcard_session = flashcard_sessions_collection.find_one({"session_id": session_id})
+        
+        if not quiz_session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Remove MongoDB's _id field
+        quiz_session.pop("_id", None)
+        if flashcard_session:
+            flashcard_session.pop("_id", None)
+        
+        return {
+            "session_id": session_id,
+            "quiz": quiz_session,
+            "flashcards": flashcard_session or {"cards": []},
+            "created_at": quiz_session.get("created_at", "N/A")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error retrieving session details: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving session: {str(e)}"
+        )

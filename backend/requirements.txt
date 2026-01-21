@@ -15,3 +15,4 @@ transformers
 pytesseract
 accelerate
 python-docx
+nltk

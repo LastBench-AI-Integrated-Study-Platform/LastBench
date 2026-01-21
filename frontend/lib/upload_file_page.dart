@@ -30,6 +30,11 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
   String? extractedText;
   bool showTextPreview = false;
 
+  // History state
+  List<Map<String, dynamic>> sessions = [];
+  bool isLoadingHistory = false;
+  Map<String, bool> expandedSessions = {};
+
   static const navy = Color(0xFF033F63);
   static const teal = Color(0xFF379392);
 
@@ -69,6 +74,91 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
   }
 
   bool get canGenerate => (pdfBytes != null) || (imageBytes != null);
+
+  Future<void> loadSessionsHistory() async {
+    setState(() {
+      isLoadingHistory = true;
+    });
+
+    try {
+      final response = await http
+          .get(Uri.parse('${AppConfig.uploadEndpoint}/sessions/history'))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          sessions = List<Map<String, dynamic>>.from(data['sessions'] ?? []);
+          isLoadingHistory = false;
+        });
+      } else {
+        setState(() {
+          isLoadingHistory = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load history: ${response.statusCode}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingHistory = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading history: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> loadSessionDetails(String sessionId) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('${AppConfig.uploadEndpoint}/sessions/$sessionId/full'),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          _showSessionDetailsDialog(context, data);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load session: ${response.statusCode}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading session: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadSessionsHistory();
+  }
 
   Future<void> generateQuizAndFlashcards() async {
     if (!canGenerate) return;
@@ -393,6 +483,423 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
     );
   }
 
+  Future<void> _showSessionDetailsDialog(
+    BuildContext context,
+    Map<String, dynamic> sessionData,
+  ) async {
+    return await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        final quiz = sessionData['quiz'] as Map<String, dynamic>? ?? {};
+        final flashcards =
+            sessionData['flashcards'] as Map<String, dynamic>? ?? {};
+        final questions = List<Map<String, dynamic>>.from(
+          quiz['questions'] ?? [],
+        );
+        final cards = List<Map<String, dynamic>>.from(
+          flashcards['cards'] ?? [],
+        );
+
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 900, maxHeight: 800),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [navy, teal],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.history, color: Colors.white, size: 32),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Session Details',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Session ID: ${sessionData['session_id']}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Stats
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          margin: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue.shade300),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatItem(
+                                Icons.quiz,
+                                'Questions',
+                                questions.length.toString(),
+                                Colors.blue,
+                              ),
+                              _buildStatItem(
+                                Icons.style,
+                                'Flashcards',
+                                cards.length.toString(),
+                                Colors.purple,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Quiz Section
+                        if (questions.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.quiz,
+                                      color: navy,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Quiz Questions',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: navy,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                ...questions.asMap().entries.map((entry) {
+                                  int idx = entry.key;
+                                  Map<String, dynamic> q = entry.value;
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Q${idx + 1}: ${q['question'] ?? ''}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        ...(q['options'] as List? ?? [])
+                                            .asMap()
+                                            .entries
+                                            .map((opt) {
+                                              int optIdx = opt.key;
+                                              String optValue = opt.value
+                                                  .toString();
+                                              bool isCorrect =
+                                                  q['correct_answer'] == optIdx;
+                                              return Padding(
+                                                padding: const EdgeInsets.only(
+                                                  bottom: 6,
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 20,
+                                                      height: 20,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: isCorrect
+                                                            ? Colors.green
+                                                            : Colors
+                                                                  .grey
+                                                                  .shade300,
+                                                      ),
+                                                      child: Center(
+                                                        child: Text(
+                                                          String.fromCharCode(
+                                                            65 + optIdx,
+                                                          ),
+                                                          style: TextStyle(
+                                                            color: isCorrect
+                                                                ? Colors.white
+                                                                : Colors
+                                                                      .grey
+                                                                      .shade600,
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        optValue,
+                                                        style: TextStyle(
+                                                          fontSize: 13,
+                                                          color: isCorrect
+                                                              ? Colors.green
+                                                              : Colors.black,
+                                                          fontWeight: isCorrect
+                                                              ? FontWeight.w600
+                                                              : FontWeight
+                                                                    .normal,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (isCorrect)
+                                                      const Icon(
+                                                        Icons.check_circle,
+                                                        color: Colors.green,
+                                                        size: 16,
+                                                      ),
+                                                  ],
+                                                ),
+                                              );
+                                            })
+                                            .toList(),
+                                        if (q['explanation'] != null &&
+                                            q['explanation']
+                                                .toString()
+                                                .isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8,
+                                            ),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber.shade50,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                'Explanation: ${q['explanation']}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.amber.shade900,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          ),
+
+                        // Flashcards Section
+                        if (cards.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.style,
+                                      color: navy,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Flashcards',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: navy,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                ...cards.asMap().entries.map((entry) {
+                                  int idx = entry.key;
+                                  Map<String, dynamic> card = entry.value;
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.purple.shade300,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Card ${idx + 1}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: navy,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Front:',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                card['question'] ??
+                                                    card['front'] ??
+                                                    '',
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'Back:',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                card['answer'] ??
+                                                    card['back'] ??
+                                                    '',
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          ),
+
+                        if (questions.isEmpty && cards.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Center(
+                              child: Text(
+                                'No quiz or flashcard data available',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -458,7 +965,7 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
                 ),
 
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 50, top: 30),
+                  padding: const EdgeInsets.only(bottom: 30, top: 30),
                   child: Column(
                     children: [
                       ElevatedButton(
@@ -536,6 +1043,295 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
                               fontSize: 13,
                             ),
                           ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // History Section
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 50),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 40),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, color: Colors.blue),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Pull to refresh to see latest sessions',
+                                style: TextStyle(
+                                  color: Colors.blue.shade800,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Icon(Icons.history, color: navy, size: 28),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'History',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: navy,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (sessions.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: teal,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${sessions.length} session${sessions.length > 1 ? 's' : ''}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (isLoadingHistory)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              children: [
+                                const SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      teal,
+                                    ),
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Loading history...',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else if (sessions.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.history_toggle_off,
+                                  size: 48,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No sessions yet',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Upload a file and generate quizzes to see them here',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        Column(
+                          children: sessions.map((session) {
+                            String sessionId = session['session_id'] ?? '';
+                            String createdAt =
+                                session['created_at'] ?? 'Unknown';
+                            String textPreview =
+                                session['text'] ?? 'No preview';
+
+                            // Format date
+                            String formattedDate = 'Unknown';
+                            try {
+                              DateTime dateTime = DateTime.parse(createdAt);
+                              formattedDate =
+                                  '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+                            } catch (e) {
+                              formattedDate = createdAt;
+                            }
+
+                            bool isExpanded =
+                                expandedSessions[sessionId] ?? false;
+
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isExpanded
+                                      ? teal
+                                      : Colors.grey.shade300,
+                                  width: isExpanded ? 2 : 1,
+                                ),
+                                boxShadow: isExpanded
+                                    ? [
+                                        BoxShadow(
+                                          color: teal.withOpacity(0.2),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: Column(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () async {
+                                      setState(() {
+                                        expandedSessions[sessionId] =
+                                            !isExpanded;
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Session: ${sessionId.substring(0, 8)}...',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: navy,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  formattedDate,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Container(
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                        maxWidth: 400,
+                                                      ),
+                                                  child: Text(
+                                                    'Preview: $textPreview...',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color:
+                                                          Colors.grey.shade500,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          AnimatedRotation(
+                                            turns: isExpanded ? 0.5 : 0,
+                                            duration: const Duration(
+                                              milliseconds: 300,
+                                            ),
+                                            child: Icon(
+                                              Icons.expand_more,
+                                              color: teal,
+                                              size: 24,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (isExpanded)
+                                    Container(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        0,
+                                        16,
+                                        16,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          const Divider(),
+                                          const SizedBox(height: 12),
+                                          ElevatedButton.icon(
+                                            onPressed: () async {
+                                              await loadSessionDetails(
+                                                sessionId,
+                                              );
+                                            },
+                                            icon: const Icon(Icons.visibility),
+                                            label: const Text(
+                                              'View Full Details',
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: teal,
+                                              foregroundColor: Colors.white,
+                                              minimumSize: const Size(
+                                                double.infinity,
+                                                44,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
                         ),
                     ],
                   ),
