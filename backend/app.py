@@ -1,143 +1,208 @@
 import os
+import traceback
+from pathlib import Path
 
-os.environ["GRPC_DNS_RESOLVER"] = "native"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from routes import combined_routes
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import shutil, numpy as np
+import shutil
 from pypdf import PdfReader
 from pdf2image import convert_from_path
-import google.generativeai as genai
+import pytesseract
+from groq import Groq
 import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
 
-from db.connection import db
-
+# ================= CONFIG =================
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-gemini = genai.GenerativeModel("gemini-2.5-flash")
+# Required packages:
+# pip install fastapi uvicorn python-multipart pypdf pdf2image pytesseract sentence-transformers faiss-cpu python-dotenv groq langchain-text-splitters
 
-app = FastAPI()
+# System dependencies (macOS example):
+# brew install tesseract poppler
+
+# ================= INIT =================
+app = FastAPI(title="PDF Question Answering with Groq")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Global state (simple - for development only)
 vector_store = None
 documents = []
 
-# ---------- HELPERS ----------
-
-def extract_text_auto(pdf_path):
-    reader = PdfReader(pdf_path)
-    text = "".join(page.extract_text() or "" for page in reader.pages)
-
-    if len(text.strip()) > 150:
-        return text
-
-    pages = convert_from_path(pdf_path, dpi=300)
-    full_text = ""
-    prompt = "Extract handwritten text accurately. Fix grammar. Return ONLY text."
-
-    for page in pages:
-        res = gemini.generate_content([prompt, page])
-        full_text += res.text + "\n"
-
-    return full_text
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 
-def safe_embed(text):
+# ================= HELPERS =================
+def extract_text(pdf_path: Path | str) -> str:
+    """Try native text extraction → OCR fallback"""
+    path = Path(pdf_path)
+    print(f"Extracting: {path.name}")
+
+    # 1. Native PDF text
     try:
-        return genai.embed_content(
-            model="text-embedding-004",
-            content=text
-        )["embedding"]
+        reader = PdfReader(path)
+        text = "".join(page.extract_text() or "" for page in reader.pages)
+        text = text.strip()
+        if len(text) > 250:
+            print(f"  → Native text extracted ({len(text)} chars)")
+            return text
     except Exception as e:
-        print("Embedding failed:", e)
-        return None
+        print(f"  Native extraction failed: {e}")
+
+    # OCR fallback with EasyOCR (better for handwriting)
+    print("  → Trying EasyOCR (better handwriting support)...")
+    try:
+        reader = easyocr.Reader(['en'], gpu=False)
+        images = convert_from_path(path, dpi=200)
+        full_text = []
+        for i, img in enumerate(images, 1):
+            # Preprocess: grayscale + enhance contrast
+            img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+            enhanced = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
+            result = reader.readtext(enhanced, detail=0, paragraph=True)
+            page_text = " ".join(result)
+            full_text.append(f"[Page {i}]\n{page_text.strip()}\n")
+        return "\n".join(full_text).strip()
+    except Exception as e:
+        print("EasyOCR failed:", e)
+        # fall back to pytesseract or placeholder
 
 
-def build_vector_store(notes_text):
+def build_vector_store(text: str):
     global vector_store, documents
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    documents = splitter.split_text(notes_text)
+    if not text.strip():
+        raise ValueError("No text could be extracted from the document")
 
-    embeddings = []
-    for doc in documents:
-        emb = safe_embed(doc)
-        if emb:
-            embeddings.append(emb)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=550,
+        chunk_overlap=80,
+        separators=["\n\n", "\n", ". ", " ", ""]
+    )
 
-    if not embeddings:
-        raise RuntimeError("No embeddings generated")
+    documents = splitter.split_text(text)
+    print(f"Created {len(documents)} chunks")
 
-    embeddings = np.array(embeddings).astype("float32")
-    vector_store = faiss.IndexFlatL2(embeddings.shape[1])
+    if not documents:
+        raise ValueError("No meaningful chunks after splitting")
+
+    embeddings = embedder.encode(documents, show_progress_bar=False, convert_to_numpy=True)
+    embeddings = embeddings.astype("float32")
+
+    dim = embeddings.shape[1]
+    vector_store = faiss.IndexFlatL2(dim)
     vector_store.add(embeddings)
 
 
-def safe_generate(prompt):
-    try:
-        return gemini.generate_content(prompt).text
-    except Exception as e:
-        print("Generation failed:", e)
-        return "Answer generation failed."
+def retrieve_context(question: str, k: int = 4) -> str:
+    if vector_store is None or not documents:
+        return ""
+
+    q_emb = embedder.encode([question], convert_to_numpy=True).astype("float32")
+    distances, indices = vector_store.search(q_emb, min(k, len(documents)))
+
+    relevant_chunks = [documents[i] for i in indices[0] if i < len(documents)]
+    return "\n\n".join(relevant_chunks)
 
 
-def answer_question(question):
-    query_emb = safe_embed(question)
-    if query_emb is None:
-        return "Embedding service unavailable"
+def generate_answer(context: str, question: str) -> str:
+    if len(context.strip()) < 40:
+        return "Not enough relevant information found in the provided notes."
 
-    query_emb = np.array([query_emb], dtype="float32")
-    _, idx = vector_store.search(query_emb, 3)
-
-    context = " ".join(documents[i] for i in idx[0])
-
-    prompt = f"""
-Answer ONLY from context.
+    prompt = f"""You are a helpful teaching assistant.
+Answer the question concisely and accurately using **only** the provided context.
+If the context doesn't contain the answer, say so clearly.
 
 Context:
 {context}
 
-Question:
-{question}
+Question: {question}
 
-Answer:
-"""
-    return safe_generate(prompt)
+Answer:"""
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",          # ← WORKING as of January 2026
+            # Alternative fast option: "llama-4-scout-17b-16e-instruct"
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.25,
+            max_tokens=400,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("Groq API error:", str(e))
+        return f"[Generation failed: {str(e)}]"
 
 
-# ---------- API ----------
-@app.get("/")
-async def root():
-    return {"message": "Backend is running!"}
-
+# ================= ENDPOINT =================
 @app.post("/analyze")
-async def analyze(notes: UploadFile = File(...), questions: UploadFile = File(...)):
-    os.makedirs("uploads", exist_ok=True)
+async def analyze_notes_and_questions(
+    notes: UploadFile = File(...),
+    questions: UploadFile = File(...)
+):
+    try:
+        # Save uploaded files
+        notes_path = UPLOAD_DIR / notes.filename
+        questions_path = UPLOAD_DIR / questions.filename
 
-    notes_path = f"uploads/{notes.filename}"
-    q_path = f"uploads/{questions.filename}"
+        with notes_path.open("wb") as f:
+            shutil.copyfileobj(notes.file, f)
 
-    with open(notes_path, "wb") as f:
-        shutil.copyfileobj(notes.file, f)
-    with open(q_path, "wb") as f:
-        shutil.copyfileobj(questions.file, f)
+        with questions_path.open("wb") as f:
+            shutil.copyfileobj(questions.file, f)
 
-    notes_text = extract_text_auto(notes_path)
-    build_vector_store(notes_text)
+        # Extract text
+        notes_text = extract_text(notes_path)
+        questions_text = extract_text(questions_path)
 
-    q_text = extract_text_auto(q_path)
-    questions_list = [q for q in q_text.split("\n") if q.strip()]
+        print(f"Notes length: {len(notes_text):,} chars")
+        print(f"Questions length: {len(questions_text):,} chars")
 
-    results = [{"question": q, "answer": answer_question(q)} for q in questions_list]
-    return {"results": results}
+        # Build vector store from notes
+        build_vector_store(notes_text)
 
+        # Parse questions
+        raw_questions = [line.strip() for line in questions_text.splitlines() if line.strip()]
+        question_list = [q for q in raw_questions if len(q) > 5][:25]
+
+        if not question_list:
+            raise HTTPException(400, detail="No valid questions found in the questions file")
+
+        # Generate answers
+        results = []
+        for q in question_list:
+            context = retrieve_context(q)
+            answer = generate_answer(context, q)
+            results.append({"question": q, "answer": answer})
+
+        return {"results": results}
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Server error: {str(e)}\nCheck terminal for full traceback"
+        )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
 app.include_router(combined_routes.router, prefix="/api")
