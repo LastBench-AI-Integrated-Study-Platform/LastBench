@@ -15,7 +15,14 @@ from groq import Groq
 import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
+
 from sentence_transformers import SentenceTransformer
+
+from db.connection import db
+from routes.auth_routes import router as auth_router
+from routes.insights_routes import router as insights_router
+
+
 
 # ================= CONFIG =================
 load_dotenv()
@@ -36,6 +43,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router)
+
+app.include_router(insights_router)
+
+app.include_router(auth_router)
+
+app.include_router(insights_router)
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 embedder = SentenceTransformer("all-MiniLM-L6-v2")

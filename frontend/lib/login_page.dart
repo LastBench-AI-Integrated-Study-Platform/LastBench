@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import 'last_bench_home.dart';
+
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -24,23 +28,34 @@ class _LoginPageState extends State<LoginPage> {
   static const Color teal = Color(0xFF379392);
 
   void submitLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      isLoading = true;
-      error = null;
-    });
+  setState(() {
+    isLoading = true;
+    error = null;
+  });
 
-    await Future.delayed(const Duration(seconds: 2));
+  try {
+    final res = await AuthService.login(
+      email: emailController.text,
+      password: passwordController.text,
+    );
 
-    setState(() {
-      isLoading = false;
-    });
+    // 👇 login success
+Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (_) => const LastBenchHome(),
+  ),
+);
 
-    debugPrint("Login Email: ${emailController.text}");
-    debugPrint("Password: ${emailController.text}");
-    debugPrint("Remember Me: $rememberMe");
+  } catch (e) {
+    setState(() => error = e.toString());
   }
+
+  setState(() => isLoading = false);
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -56,15 +71,16 @@ class _LoginPageState extends State<LoginPage> {
               children: [
 
                 // Back button
-                TextButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back, color: navy),
-                  label: const Text(
-                    "Back",
-                    style: TextStyle(
-                        color: navy, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                TextButton(
+  onPressed: () {
+    Navigator.pushNamed(context, '/signup');
+  },
+  child: const Text(
+    "New to Last Bench? Create an account",
+    style: TextStyle(color: teal),
+  ),
+),
+
 
                 const SizedBox(height: 20),
 

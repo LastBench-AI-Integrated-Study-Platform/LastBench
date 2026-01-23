@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'ask_from_pdf_page.dart';
-import 'upload_file_page.dart';
+import 'daily_insights_card.dart';
+
 
 class LastBenchHome extends StatefulWidget {
   const LastBenchHome({super.key});
@@ -10,37 +11,13 @@ class LastBenchHome extends StatefulWidget {
 }
 
 class _LastBenchHomeState extends State<LastBenchHome> {
-  int currentFactIndex = 0;
-
+ 
   // Colors
   static const Color navy = Color(0xFF033F63);
   static const Color teal = Color(0xFF379392);
 
   // Facts
-  final List<Map<String, String>> facts = [
-    {
-      "type": "Did You Know?",
-      "content": "70% of toppers revise PYQs more than new questions.",
-    },
-    {
-      "type": "Exam Shortcut",
-      "content": "OS Deadlock prevention = break at least 1 Coffman condition.",
-    },
-    {
-      "type": "Placement Tip",
-      "content": "HR rounds check consistency, not perfection.",
-    },
-    {
-      "type": "Motivation",
-      "content":
-          "Sitting at the last bench doesn't decide rank. Effort does 🔥",
-    },
-    {
-      "type": "Quick Fact",
-      "content": "Most asked topic in CN: Flow control & congestion.",
-    },
-  ];
-
+  
   // Quick actions
   final List<Map<String, dynamic>> quickActions = [
     {
@@ -246,36 +223,12 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               ),
             ),
 
-            // Facts
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  currentFactIndex = (currentFactIndex + 1) % facts.length;
-                });
-              },
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: teal,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      facts[currentFactIndex]["type"]!,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      facts[currentFactIndex]["content"]!,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // Daily Insights (Dynamic)
+const Padding(
+  padding: EdgeInsets.symmetric(horizontal: 16),
+  child: DailyInsightsCard(),
+),
+
 
             // Study Rooms Header
             Padding(
