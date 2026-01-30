@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
+import 'upload_file_page.dart';
+import 'deadline_tracker_page.dart';
 
 
 class LastBenchHome extends StatefulWidget {
@@ -50,6 +52,13 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       "badge": "New",
       "color": teal,
     },
+    {
+  "icon": Icons.schedule,
+  "title": "Deadline Tracker",
+  "subtitle": "Track tasks & exams",
+  "color": teal,
+},
+
   ];
 
   // Study rooms
@@ -160,23 +169,32 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () {
-                        if (action["title"] == "Ask from PDF") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => UploadScreen(),
-                            ),
-                          );
-                        } else if (action["title"] ==
-                            "Quiz cards + Flashcards") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const UploadFileScreen(),
-                            ),
-                          );
-                        }
-                      },
+  if (action["title"] == "Ask from PDF") {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UploadScreen(),
+      ),
+    );
+  } 
+  else if (action["title"] == "Quiz cards + Flashcards") {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const UploadFileScreen(),
+      ),
+    );
+  } 
+  else if (action["title"] == "Deadline Tracker") {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const DeadlineTrackerPage(),
+      ),
+    );
+  }
+},
+
 
                       child: Card(
                         shape: RoundedRectangleBorder(

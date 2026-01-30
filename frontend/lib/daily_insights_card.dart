@@ -10,50 +10,48 @@ class DailyInsightsCard extends StatefulWidget {
 }
 
 class _DailyInsightsCardState extends State<DailyInsightsCard> {
-  String insightTitle = "Daily Insight ✨";
+  String insightTitle = "Study Boost";
   String insightText = "Loading...";
   bool isLoading = false;
 
   Future<void> fetchInsight() async {
-  if (isLoading) return;
+    if (isLoading) return;
 
-  setState(() => isLoading = true);
+    setState(() => isLoading = true);
 
-  try {
-    final url = Uri.parse("http://127.0.0.1:8000/insights/daily");
+    try {
+      final url = Uri.parse("http://127.0.0.1:8000/insights/daily");
+      final res = await http.get(url);
 
-    final res = await http.get(url);
-
-    if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
-
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          insightText = data["insight"] ?? "No insight found";
+        });
+      } else {
+        setState(() {
+          insightText = "Failed to load insight 😢";
+        });
+      }
+    } catch (e) {
       setState(() {
-        insightText = data["insight"] ?? "No insight found";
+        insightText = "Error loading insight 😢";
       });
-    } else {
-      setState(() {
-        insightText = "Failed to load insight 😢";
-      });
+    } finally {
+      setState(() => isLoading = false);
     }
-  } catch (e) {
-    setState(() {
-      insightText = "Error loading insight 😢";
-    });
-  } finally {
-    setState(() => isLoading = false);
   }
-}
 
   @override
   void initState() {
     super.initState();
-    fetchInsight(); // ✅ runs on page open/refresh
+    fetchInsight();
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: fetchInsight, // ✅ click -> next insight
+      onTap: fetchInsight,
       child: Container(
         margin: const EdgeInsets.all(16),
         padding: const EdgeInsets.all(20),
@@ -69,7 +67,6 @@ class _DailyInsightsCardState extends State<DailyInsightsCard> {
               style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 12),
-
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 450),
               transitionBuilder: (child, animation) {
@@ -88,7 +85,7 @@ class _DailyInsightsCardState extends State<DailyInsightsCard> {
                     )
                   : Text(
                       insightText,
-                      key: ValueKey("insight_$insightText"),
+                      key: ValueKey("insight_text"),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,

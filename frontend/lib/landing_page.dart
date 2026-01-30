@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'daily_insights_card.dart';
-
-
+import 'deadline_tracker_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -11,16 +10,9 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  
-
   // Brand colors
   static const Color navy = Color(0xFF033F63);
   static const Color teal = Color(0xFF379392);
-  final Set<String> shownFacts = {};
-
- 
-
- 
 
   final List<Map<String, dynamic>> features = [
     {
@@ -116,6 +108,7 @@ class _LandingPageState extends State<LandingPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // ✅ NAVIGATION ADDED HERE
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: teal,
@@ -124,7 +117,15 @@ class _LandingPageState extends State<LandingPage> {
                             vertical: 14,
                           ),
                         ),
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const DeadlineTrackerPage(),
+                            ),
+                          );
+                        },
                         child: const Text("Get Started Free"),
                       ),
                       const SizedBox(width: 16),
@@ -138,7 +139,6 @@ class _LandingPageState extends State<LandingPage> {
               ),
             ),
 
-            // ---------------- FACT CARD ----------------
             // ---------------- FACT CARD ----------------
             const DailyInsightsCard(),
 
@@ -169,11 +169,11 @@ class _LandingPageState extends State<LandingPage> {
                     itemCount: features.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.35,
-                        ),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.35,
+                    ),
                     itemBuilder: (context, index) {
                       final f = features[index];
                       return Card(

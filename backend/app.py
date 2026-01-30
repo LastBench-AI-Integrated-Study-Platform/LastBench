@@ -1,59 +1,34 @@
 import os
 import traceback
 from pathlib import Path
+import shutil
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from routes import combined_routes
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import shutil
+from dotenv import load_dotenv
+
 from pypdf import PdfReader
 from pdf2image import convert_from_path
 import pytesseract
+
 from groq import Groq
 import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
-
 from sentence_transformers import SentenceTransformer
 
-from db.connection import db
 from routes.auth_routes import router as auth_router
 from routes.insights_routes import router as insights_router
-
-
+from routes import combined_routes   # ✅ if you want /api routes
 
 # ================= CONFIG =================
 load_dotenv()
 
-# Required packages:
-# pip install fastapi uvicorn python-multipart pypdf pdf2image pytesseract sentence-transformers faiss-cpu python-dotenv groq langchain-text-splitters
-
-# System dependencies (macOS example):
-# brew install tesseract poppler
-
 # ================= INIT =================
 app = FastAPI(title="PDF Question Answering with Groq")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-from fastapi.middleware.cors import CORSMiddleware
-
+# ✅ CORS (ONLY ONCE)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,18 +37,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✅ Include routers (ONLY ONCE)
 app.include_router(auth_router)
-
 app.include_router(insights_router)
+app.include_router(combined_routes.router, prefix="/api")
 
-app.include_router(auth_router)
-
-app.include_router(insights_router)
-
+# ================= GROQ + EMBEDDINGS =================
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Global state (simple - for development only)
 vector_store = None
 documents = []
 
@@ -83,39 +55,19 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 # ================= HELPERS =================
 def extract_text(pdf_path: Path | str) -> str:
-    """Try native text extraction → OCR fallback"""
     path = Path(pdf_path)
     print(f"Extracting: {path.name}")
 
-    # 1. Native PDF text
     try:
         reader = PdfReader(path)
-        text = "".join(page.extract_text() or "" for page in reader.pages)
-        text = text.strip()
+        text = "".join(page.extract_text() or "" for page in reader.pages).strip()
         if len(text) > 250:
             print(f"  → Native text extracted ({len(text)} chars)")
             return text
     except Exception as e:
         print(f"  Native extraction failed: {e}")
 
-    # OCR fallback with EasyOCR (better for handwriting)
-    print("  → Trying EasyOCR (better handwriting support)...")
-    try:
-        reader = easyocr.Reader(['en'], gpu=False)
-        images = convert_from_path(path, dpi=200)
-        full_text = []
-        for i, img in enumerate(images, 1):
-            # Preprocess: grayscale + enhance contrast
-            img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-            enhanced = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
-            result = reader.readtext(enhanced, detail=0, paragraph=True)
-            page_text = " ".join(result)
-            full_text.append(f"[Page {i}]\n{page_text.strip()}\n")
-        return "\n".join(full_text).strip()
-    except Exception as e:
-        print("EasyOCR failed:", e)
-        # fall back to pytesseract or placeholder
+    return ""
 
 
 def build_vector_store(text: str):
@@ -132,9 +84,6 @@ def build_vector_store(text: str):
 
     documents = splitter.split_text(text)
     print(f"Created {len(documents)} chunks")
-
-    if not documents:
-        raise ValueError("No meaningful chunks after splitting")
 
     embeddings = embedder.encode(documents, show_progress_bar=False, convert_to_numpy=True)
     embeddings = embeddings.astype("float32")
@@ -172,15 +121,13 @@ Answer:"""
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",          # ← WORKING as of January 2026
-            # Alternative fast option: "llama-4-scout-17b-16e-instruct"
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.25,
             max_tokens=400,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print("Groq API error:", str(e))
         return f"[Generation failed: {str(e)}]"
 
 
@@ -191,7 +138,6 @@ async def analyze_notes_and_questions(
     questions: UploadFile = File(...)
 ):
     try:
-        # Save uploaded files
         notes_path = UPLOAD_DIR / notes.filename
         questions_path = UPLOAD_DIR / questions.filename
 
@@ -201,24 +147,17 @@ async def analyze_notes_and_questions(
         with questions_path.open("wb") as f:
             shutil.copyfileobj(questions.file, f)
 
-        # Extract text
         notes_text = extract_text(notes_path)
         questions_text = extract_text(questions_path)
 
-        print(f"Notes length: {len(notes_text):,} chars")
-        print(f"Questions length: {len(questions_text):,} chars")
-
-        # Build vector store from notes
         build_vector_store(notes_text)
 
-        # Parse questions
         raw_questions = [line.strip() for line in questions_text.splitlines() if line.strip()]
         question_list = [q for q in raw_questions if len(q) > 5][:25]
 
         if not question_list:
-            raise HTTPException(400, detail="No valid questions found in the questions file")
+            raise HTTPException(status_code=400, detail="No valid questions found")
 
-        # Generate answers
         results = []
         for q in question_list:
             context = retrieve_context(q)
@@ -229,13 +168,4 @@ async def analyze_notes_and_questions(
 
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Server error: {str(e)}\nCheck terminal for full traceback"
-        )
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
-app.include_router(combined_routes.router, prefix="/api")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")

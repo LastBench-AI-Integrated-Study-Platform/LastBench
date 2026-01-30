@@ -21,11 +21,12 @@ class LastBenchApp extends StatelessWidget {
       ),
 
       // 👇 First screen
-      initialRoute: '/login',
+      initialRoute: '/home',
 
       routes: {
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignupPage(),
+        '/home': (context) => const LastBenchHome(),
       },
     );
   }
