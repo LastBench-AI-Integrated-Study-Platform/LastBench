@@ -57,6 +57,10 @@ backend/uploads/
 # =========================
 app.*.symbols
 
+# Flutter build output
+frontend/build/
+
+
 # =========================
 # Obfuscation
 # =========================
