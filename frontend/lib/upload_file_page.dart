@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'quizandflash.dart';
 import 'config.dart';
 
@@ -34,6 +35,9 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
   List<Map<String, dynamic>> sessions = [];
   bool isLoadingHistory = false;
   Map<String, bool> expandedSessions = {};
+
+  // Logged-in user
+  String? currentUserEmail;
 
   static const navy = Color(0xFF033F63);
   static const teal = Color(0xFF379392);
@@ -81,9 +85,14 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
     });
 
     try {
-      final response = await http
-          .get(Uri.parse('${AppConfig.uploadEndpoint}/sessions/history'))
-          .timeout(const Duration(seconds: 10));
+      // Include user email as query param when available so backend can filter sessions
+      final uri = currentUserEmail == null
+          ? Uri.parse('${AppConfig.uploadEndpoint}/sessions/history')
+          : Uri.parse(
+              '${AppConfig.uploadEndpoint}/sessions/history?email=${Uri.encodeComponent(currentUserEmail!)}',
+            );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -121,11 +130,14 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
 
   Future<void> loadSessionDetails(String sessionId) async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.uploadEndpoint}/sessions/$sessionId/full'),
-          )
-          .timeout(const Duration(seconds: 10));
+      // Request full session details and include user email so backend can enforce ownership
+      final uri = currentUserEmail == null
+          ? Uri.parse('${AppConfig.uploadEndpoint}/sessions/$sessionId/full')
+          : Uri.parse(
+              '${AppConfig.uploadEndpoint}/sessions/$sessionId/full?email=${Uri.encodeComponent(currentUserEmail!)}',
+            );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -157,7 +169,16 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
   @override
   void initState() {
     super.initState();
-    loadSessionsHistory();
+    _loadCurrentUserAndHistory();
+  }
+
+  Future<void> _loadCurrentUserAndHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      currentUserEmail = prefs.getString('user_email');
+    } catch (_) {}
+
+    await loadSessionsHistory();
   }
 
   Future<void> generateQuizAndFlashcards() async {
@@ -182,6 +203,11 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
       request.files.add(
         http.MultipartFile.fromBytes('file', fileBytes!, filename: fileName),
       );
+
+      // Attach user identifier if available so backend can associate sessions
+      if (currentUserEmail != null) {
+        request.fields['user_email'] = currentUserEmail!;
+      }
 
       if (mounted) {
         setState(() {

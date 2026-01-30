@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'last_bench_home.dart';
-
-
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,34 +27,41 @@ class _LoginPageState extends State<LoginPage> {
   static const Color teal = Color(0xFF379392);
 
   void submitLogin() async {
-  if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
-  setState(() {
-    isLoading = true;
-    error = null;
-  });
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
 
-  try {
-    final res = await AuthService.login(
-      email: emailController.text,
-      password: passwordController.text,
-    );
+    try {
+      final res = await AuthService.login(
+        email: emailController.text,
+        password: passwordController.text,
+      );
 
-    // 👇 login success
-Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (_) => const LastBenchHome(),
-  ),
-);
+      // 👇 login success - extract user object and persist minimal info
+      final user = res['user'] as Map<String, dynamic>?;
+      final userName = user?['name'] as String? ?? 'Dude';
+      final userEmail = user?['email'] as String?;
 
-  } catch (e) {
-    setState(() => error = e.toString());
+      // Persist email and name locally using SharedPreferences
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (userEmail != null) await prefs.setString('user_email', userEmail);
+        await prefs.setString('user_name', userName);
+      } catch (_) {}
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => LastBenchHome(userName: userName)),
+      );
+    } catch (e) {
+      setState(() => error = e.toString());
+    }
+
+    setState(() => isLoading = false);
   }
-
-  setState(() => isLoading = false);
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -69,18 +75,16 @@ Navigator.pushReplacement(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 // Back button
                 TextButton(
-  onPressed: () {
-    Navigator.pushNamed(context, '/signup');
-  },
-  child: const Text(
-    "New to Last Bench? Create an account",
-    style: TextStyle(color: teal),
-  ),
-),
-
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/signup');
+                  },
+                  child: const Text(
+                    "New to Last Bench? Create an account",
+                    style: TextStyle(color: teal),
+                  ),
+                ),
 
                 const SizedBox(height: 20),
 
@@ -124,7 +128,7 @@ Navigator.pushReplacement(
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
                             blurRadius: 10,
-                          )
+                          ),
                         ],
                       ),
                       child: Form(
@@ -132,21 +136,17 @@ Navigator.pushReplacement(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
                             if (error != null)
                               Container(
-                                margin:
-                                    const EdgeInsets.only(bottom: 16),
+                                margin: const EdgeInsets.only(bottom: 16),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
-                                  borderRadius:
-                                      BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   error!,
-                                  style: const TextStyle(
-                                      color: Colors.red),
+                                  style: const TextStyle(color: Colors.red),
                                 ),
                               ),
 
@@ -154,31 +154,26 @@ Navigator.pushReplacement(
                             const Text(
                               "Email Address",
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: navy),
+                                fontWeight: FontWeight.bold,
+                                color: navy,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: emailController,
-                              keyboardType:
-                                  TextInputType.emailAddress,
+                              keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.mail,
-                                    color: navy),
-                                hintText:
-                                    "yourname@example.com",
+                                prefixIcon: const Icon(Icons.mail, color: navy),
+                                hintText: "yourname@example.com",
                                 filled: true,
-                                fillColor:
-                                    Colors.grey.shade100,
+                                fillColor: Colors.grey.shade100,
                                 border: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
+                                if (value == null || value.isEmpty) {
                                   return "Email is required";
                                 }
                                 if (!value.contains("@")) {
@@ -194,16 +189,16 @@ Navigator.pushReplacement(
                             const Text(
                               "Password",
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: navy),
+                                fontWeight: FontWeight.bold,
+                                color: navy,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: passwordController,
                               obscureText: !showPassword,
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.lock,
-                                    color: navy),
+                                prefixIcon: const Icon(Icons.lock, color: navy),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     showPassword
@@ -213,25 +208,20 @@ Navigator.pushReplacement(
                                   ),
                                   onPressed: () {
                                     setState(() {
-                                      showPassword =
-                                          !showPassword;
+                                      showPassword = !showPassword;
                                     });
                                   },
                                 ),
-                                hintText:
-                                    "Enter your password",
+                                hintText: "Enter your password",
                                 filled: true,
-                                fillColor:
-                                    Colors.grey.shade100,
+                                fillColor: Colors.grey.shade100,
                                 border: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null ||
-                                    value.length < 6) {
+                                if (value == null || value.length < 6) {
                                   return "Password must be at least 6 characters";
                                 }
                                 return null;
@@ -242,8 +232,7 @@ Navigator.pushReplacement(
 
                             // Remember + Forgot
                             Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Row(
                                   children: [
@@ -252,8 +241,7 @@ Navigator.pushReplacement(
                                       activeColor: teal,
                                       onChanged: (value) {
                                         setState(() {
-                                          rememberMe =
-                                              value ?? false;
+                                          rememberMe = value ?? false;
                                         });
                                       },
                                     ),
@@ -264,10 +252,9 @@ Navigator.pushReplacement(
                                   onPressed: () {},
                                   child: const Text(
                                     "Forgot password?",
-                                    style:
-                                        TextStyle(color: teal),
+                                    style: TextStyle(color: teal),
                                   ),
-                                )
+                                ),
                               ],
                             ),
 
@@ -280,24 +267,17 @@ Navigator.pushReplacement(
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: teal,
-                                  shape:
-                                      RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(
-                                            12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                onPressed: isLoading
-                                    ? null
-                                    : submitLogin,
+                                onPressed: isLoading ? null : submitLogin,
                                 child: Text(
-                                  isLoading
-                                      ? "Signing in..."
-                                      : "Sign In",
+                                  isLoading ? "Signing in..." : "Sign In",
                                   style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight:
-                                          FontWeight.bold),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
@@ -308,24 +288,18 @@ Navigator.pushReplacement(
                             Row(
                               children: [
                                 Expanded(
-                                    child: Divider(
-                                        color: Colors
-                                            .grey.shade300)),
+                                  child: Divider(color: Colors.grey.shade300),
+                                ),
                                 const Padding(
-                                  padding:
-                                      EdgeInsets.symmetric(
-                                          horizontal: 8),
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
                                   child: Text(
                                     "Or continue with",
-                                    style: TextStyle(
-                                        color:
-                                            Colors.black54),
+                                    style: TextStyle(color: Colors.black54),
                                   ),
                                 ),
                                 Expanded(
-                                    child: Divider(
-                                        color: Colors
-                                            .grey.shade300)),
+                                  child: Divider(color: Colors.grey.shade300),
+                                ),
                               ],
                             ),
 
@@ -335,25 +309,21 @@ Navigator.pushReplacement(
                             Row(
                               children: [
                                 Expanded(
-                                  child:
-                                      OutlinedButton.icon(
+                                  child: OutlinedButton.icon(
                                     onPressed: () {},
                                     icon: const Icon(
-                                        Icons.g_mobiledata,
-                                        color: navy),
-                                    label:
-                                        const Text("Google"),
+                                      Icons.g_mobiledata,
+                                      color: navy,
+                                    ),
+                                    label: const Text("Google"),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child:
-                                      OutlinedButton.icon(
+                                  child: OutlinedButton.icon(
                                     onPressed: () {},
-                                    icon: const Icon(Icons.code,
-                                        color: navy),
-                                    label:
-                                        const Text("GitHub"),
+                                    icon: const Icon(Icons.code, color: navy),
+                                    label: const Text("GitHub"),
                                   ),
                                 ),
                               ],
@@ -384,8 +354,9 @@ Navigator.pushReplacement(
                   child: Text(
                     "\"Back benchers welcome. Top ranks guaranteed.\"",
                     style: TextStyle(
-                        fontStyle: FontStyle.italic,
-                        color: Colors.black45),
+                      fontStyle: FontStyle.italic,
+                      color: Colors.black45,
+                    ),
                   ),
                 ),
 
