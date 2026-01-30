@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'last_bench_home.dart';
+import 'forgot_password_flow.dart';
+
 
 
 
@@ -261,13 +263,22 @@ Navigator.pushReplacement(
                                   ],
                                 ),
                                 TextButton(
-                                  onPressed: () {},
-                                  child: const Text(
-                                    "Forgot password?",
-                                    style:
-                                        TextStyle(color: teal),
-                                  ),
-                                )
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordFlow(
+          onBack: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  },
+  child: const Text(
+    "Forgot password?",
+    style: TextStyle(color: teal),
+  ),
+),
+
                               ],
                             ),
 
