@@ -1,25 +1,31 @@
 from fastapi import APIRouter, HTTPException
 import requests
+import random
 
 router = APIRouter(prefix="/insights", tags=["Insights"])
 
 @router.get("/daily")
 def get_daily_insight():
     try:
-        url = "https://zenquotes.io/api/random"
-        r = requests.get(url, timeout=10)
+        res = requests.get("https://zenquotes.io/api/quotes")
 
-        if r.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Quotes API failed: {r.status_code}")
+        if res.status_code != 200:
+            raise HTTPException(status_code=500, detail="Quotes API failed")
 
-        data = r.json()  # list
-        quote = data[0]["q"]
-        author = data[0]["a"]
+        data = res.json()
 
-        return {
-            "type": "Motivation ✨",
-            "insight": f"{quote} — {author}"
-        }
+        keywords = ["study", "education", "learning", "success", "hard work", "focus", "goal"]
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        filtered = []
+        for q in data:
+            quote_text = q.get("q", "").lower()
+            if any(k in quote_text for k in keywords):
+                filtered.append(q.get("q"))
+
+        if not filtered:
+            return {"insight": random.choice(data).get("q", "Stay motivated!")}
+
+        return {"insight": random.choice(filtered)}
+
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error fetching insight")

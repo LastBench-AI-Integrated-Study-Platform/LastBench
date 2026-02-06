@@ -1,41 +1,54 @@
 import 'package:flutter/material.dart';
+import 'daily_insights_card.dart';
+import 'deadline_tracker_page.dart';
 
-class LandingPage extends StatelessWidget {
+class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
  
   @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: const _Navbar(),
-      body: SingleChildScrollView(
-        child: Center(
-        child: Column(
-          children: const [
-            HeroSection(),
-            FeaturesSection(),
-            FooterSection(),
-          ],
-        ),)
-      ),
-    );
-  }
+  State<LandingPage> createState() => _LandingPageState();
 }
 
-/* -------------------- BRAND -------------------- */
-class Brand {
-  static const navy = Color(0xFF033F63);
-  static const teal = Color(0xFF379392);
-  static const muted = Color(0xFF6B7280);
-  static const bgSoft = Color(0xFFF9FAFB);
-}
+class _LandingPageState extends State<LandingPage> {
+  // Brand colors
+  static const Color navy = Color(0xFF033F63);
+  static const Color teal = Color(0xFF379392);
 
-class _Navbar extends StatelessWidget implements PreferredSizeWidget {
-  const _Navbar();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(80);
+  final List<Map<String, dynamic>> features = [
+    {
+      "icon": Icons.description,
+      "title": "Ask from Notes & PYQs",
+      "desc":
+          "Upload previous year questions, notes, or PDFs and ask doubts directly.",
+    },
+    {
+      "icon": Icons.chat,
+      "title": "Group Chat by Exam",
+      "desc":
+          "Join exam-specific groups to discuss problems and share resources.",
+    },
+    {
+      "icon": Icons.video_call,
+      "title": "Study Together, Live",
+      "desc": "Join live study rooms and revise together.",
+    },
+    {
+      "icon": Icons.help_outline,
+      "title": "Ask & Answer Doubts",
+      "desc": "Post doubts and get help from peers or mentors.",
+    },
+    {
+      "icon": Icons.emoji_events,
+      "title": "Quiz + Flashcards",
+      "desc":
+          "Attach your notes to auto-generate quizzes and flashcards for revision.",
+    },
+    {
+      "icon": Icons.lightbulb,
+      "title": "Daily Exam Insights",
+      "desc": "Get daily exam facts, shortcuts, and motivation.",
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
