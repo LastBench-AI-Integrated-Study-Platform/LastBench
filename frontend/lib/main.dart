@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'last_bench_home.dart';
+import 'landing_page.dart';
 
 
 void main() {
@@ -21,11 +22,12 @@ class LastBenchApp extends StatelessWidget {
       ),
 
       // 👇 First screen
-      initialRoute: '/login',
+      initialRoute: '/landing',
 
       routes: {
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignupPage(),
+        '/landing': (context) => const LandingPage(),
       },
     );
   }

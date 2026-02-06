@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
-
+import 'upload_file_page.dart';
 
 class LastBenchHome extends StatefulWidget {
   const LastBenchHome({super.key});
