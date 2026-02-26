@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import 'daily_insights_card.dart';
 import 'deadline_tracker_page.dart';
 
+class Brand {
+  static const Color navy = Color(0xFF033F63);
+  static const Color teal = Color(0xFF379392);
+  static const Color muted = Color(0xFF6B7280);
+}
+
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
- 
+
   @override
   State<LandingPage> createState() => _LandingPageState();
 }
 
 class _LandingPageState extends State<LandingPage> {
-  // Brand colors
-  static const Color navy = Color(0xFF033F63);
-  static const Color teal = Color(0xFF379392);
-
   final List<Map<String, dynamic>> features = [
     {
       "icon": Icons.description,
@@ -70,16 +72,16 @@ class _LandingPageState extends State<LandingPage> {
       actions: [
         TextButton(
           onPressed: () {
-  Navigator.pushNamed(context, '/login');
-},
+            Navigator.pushNamed(context, '/login');
+          },
 
           child: const Text(
             "Login",
             style: TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.w500,
-              letterSpacing : 1.05,
-              fontSize : 12,
+              letterSpacing: 1.05,
+              fontSize: 12,
             ),
           ),
         ),
@@ -88,13 +90,12 @@ class _LandingPageState extends State<LandingPage> {
           padding: const EdgeInsets.only(right: 16),
           child: ElevatedButton(
             onPressed: () {
-  Navigator.pushNamed(context, '/signup');
-},
+              Navigator.pushNamed(context, '/signup');
+            },
 
             style: ElevatedButton.styleFrom(
               backgroundColor: Brand.teal,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(7),
               ),
@@ -102,10 +103,10 @@ class _LandingPageState extends State<LandingPage> {
             child: const Text(
               "Sign Up",
               style: TextStyle(
-                fontSize : 12,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: Colors.white,
-                letterSpacing : 1.05,
+                letterSpacing: 1.05,
               ),
             ),
           ),
@@ -115,16 +116,14 @@ class _LandingPageState extends State<LandingPage> {
   }
 }
 
-
 /* -------------------- HERO -------------------- */
 class HeroSection extends StatelessWidget {
   const HeroSection({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
-     final width = MediaQuery.of(context).size.width;
+    final width = MediaQuery.of(context).size.width;
     return Padding(
-      
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1900),
@@ -136,29 +135,29 @@ class HeroSection extends StatelessWidget {
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 28),
-           RichText(
-  textAlign: TextAlign.center,
-  text: TextSpan(
-    style: TextStyle(
-      fontSize: width > 900 ? 42 : 30,
-      fontWeight: FontWeight.w800,
-      color: Brand.navy,
-      height: 1.15,
-    ),
-    children: const [
-      TextSpan(text: "From the "),
-      TextSpan(
-        text: "Last Bench\n",
-        style: TextStyle(color: Brand.teal),
-      ),
-      TextSpan(text: "to the "),
-      TextSpan(
-        text: "Top Rank.",
-        style: TextStyle(color: Brand.teal),
-      ),
-    ],
-  ),
-),
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: width > 900 ? 42 : 30,
+                  fontWeight: FontWeight.w800,
+                  color: Brand.navy,
+                  height: 1.15,
+                ),
+                children: const [
+                  TextSpan(text: "From the "),
+                  TextSpan(
+                    text: "Last Bench\n",
+                    style: TextStyle(color: Brand.teal),
+                  ),
+                  TextSpan(text: "to the "),
+                  TextSpan(
+                    text: "Top Rank.",
+                    style: TextStyle(color: Brand.teal),
+                  ),
+                ],
+              ),
+            ),
 
             const SizedBox(height: 20),
             SizedBox(
@@ -195,24 +194,46 @@ class FeaturesSection extends StatelessWidget {
   const FeaturesSection({super.key});
 
   static final features = [
-    _Feature(Icons.description, "Ask from Notes & PYQs",
-        "Upload previous year questions, notes, or PDFs and ask doubts directly."),
-    _Feature(Icons.chat_bubble_outline, "Group Chat by Exam",
-        "Join exam-specific groups to discuss problems and share resources."),
-    _Feature(Icons.video_call_outlined, "Study Together, Live",
-        "Join live audio study rooms to revise or stay accountable."),
-    _Feature(Icons.help_outline, "Ask & Answer Doubts",
-        "Post doubts anytime and get help from peers or mentors."),
-    _Feature(Icons.emoji_events_outlined, "Placement Preparation",
-        "Practice aptitude, technical questions, and interview prep."),
-    _Feature(Icons.lightbulb_outline, "Daily Exam Insights",
-        "Quick facts, shortcuts, and motivation every day."),
+    _Feature(
+      Icons.description,
+      "Ask from Notes & PYQs",
+      "Upload previous year questions, notes, or PDFs and ask doubts directly.",
+    ),
+    _Feature(
+      Icons.chat_bubble_outline,
+      "Group Chat by Exam",
+      "Join exam-specific groups to discuss problems and share resources.",
+    ),
+    _Feature(
+      Icons.video_call_outlined,
+      "Study Together, Live",
+      "Join live audio study rooms to revise or stay accountable.",
+    ),
+    _Feature(
+      Icons.help_outline,
+      "Ask & Answer Doubts",
+      "Post doubts anytime and get help from peers or mentors.",
+    ),
+    _Feature(
+      Icons.emoji_events_outlined,
+      "Placement Preparation",
+      "Practice aptitude, technical questions, and interview prep.",
+    ),
+    _Feature(
+      Icons.lightbulb_outline,
+      "Daily Exam Insights",
+      "Quick facts, shortcuts, and motivation every day.",
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final columns = width > 1100 ? 3 : width > 700 ? 2 : 1;
+    final columns = width > 1100
+        ? 3
+        : width > 700
+        ? 2
+        : 1;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 24),
@@ -221,25 +242,25 @@ class FeaturesSection extends StatelessWidget {
         child: Column(
           children: [
             RichText(
-  text: const TextSpan(
-    style: TextStyle(
-      fontSize: 25,
-      fontWeight: FontWeight.w900,
-      color: Brand.navy,
-    ),
-    children: [
-      TextSpan(text: "Everything You Need to "),
-      TextSpan(
-        text: "Study Smarter",
-        style: TextStyle(
-          color: Brand.teal,
-          fontWeight: FontWeight.w900, // highest possible
-          letterSpacing: 0.6,          // makes it feel bolder
-        ),
-      ),
-    ],
-  ),
-),
+              text: const TextSpan(
+                style: TextStyle(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  color: Brand.navy,
+                ),
+                children: [
+                  TextSpan(text: "Everything You Need to "),
+                  TextSpan(
+                    text: "Study Smarter",
+                    style: TextStyle(
+                      color: Brand.teal,
+                      fontWeight: FontWeight.w900, // highest possible
+                      letterSpacing: 0.6, // makes it feel bolder
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
             const SizedBox(height: 12),
             const Text(
@@ -249,26 +270,25 @@ class FeaturesSection extends StatelessWidget {
             ),
             const SizedBox(height: 40),
             Wrap(
-  spacing: 24,
-  runSpacing: 24,
-  children: features.map((feature) {
-    double cardWidth;
+              spacing: 24,
+              runSpacing: 24,
+              children: features.map((feature) {
+                double cardWidth;
 
-    if (width > 1100) {
-      cardWidth = (width - 58) / 3; // 3 columns
-    } else if (width > 700) {
-      cardWidth = (width - 24) / 2; // 2 columns
-    } else {
-      cardWidth = width; // 1 column
-    }
+                if (width > 1100) {
+                  cardWidth = (width - 58) / 3; // 3 columns
+                } else if (width > 700) {
+                  cardWidth = (width - 24) / 2; // 2 columns
+                } else {
+                  cardWidth = width; // 1 column
+                }
 
-    return SizedBox(
-      width: cardWidth,
-      child: FeatureCard(feature: feature),
-    );
-  }).toList(),
-),
-
+                return SizedBox(
+                  width: cardWidth,
+                  child: FeatureCard(feature: feature),
+                );
+              }).toList(),
+            ),
           ],
         ),
       ),
@@ -281,69 +301,58 @@ class FeatureCard extends StatelessWidget {
   final _Feature feature;
   const FeatureCard({required this.feature});
 
- @override
-Widget build(BuildContext context) {
-  return AnimatedContainer(
-    duration: const Duration(milliseconds: 200),
-    padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: const [
-        BoxShadow(
-          blurRadius: 12,
-          color: Color(0x11000000),
-        )
-      ],
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Brand.teal.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(blurRadius: 12, color: Color(0x11000000))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Brand.teal.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(feature.icon, color: Brand.teal, size: 22),
               ),
-              child: Icon(
-                feature.icon,
-                color: Brand.teal,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                feature.title,
-                style: const TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w700,
-                  color: Brand.navy,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  feature.title,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: Brand.navy,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          feature.desc,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Brand.muted,
-            height: 1.45,
+            ],
           ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    ),
-  );
-}
-
-
+          const SizedBox(height: 10),
+          Text(
+            feature.desc,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Brand.muted,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
 }
 
 class FooterSection extends StatelessWidget {
@@ -438,10 +447,7 @@ class FooterSection extends StatelessWidget {
           // 🔹 Copyright
           const Text(
             "© 2025 Last Bench. All rights reserved.",
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: Colors.white60, fontSize: 13),
           ),
         ],
       ),
@@ -461,11 +467,15 @@ class _PrimaryButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: Brand.teal,
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
         ),
       ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500,color:Colors.white)),
     );
   }
 }
@@ -481,9 +491,7 @@ class _OutlineButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         side: const BorderSide(color: Brand.navy),
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       child: Text(
         label,

@@ -43,7 +43,7 @@ def call_groq_api(prompt: str, max_tokens: int = 8000, temperature: float = 0.7)
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert educational researcher and content creator. You provide detailed, accurate information and create brilliant quiz questions and flashcards."
+                    "content": "You are an expert educational researcher and content creator specializing in exam and placement preparation. You create challenging, diverse questions and flashcards that test deep understanding, application, analysis, and problem-solving skills. Avoid repetition, ensure variety in question types, and focus on high-value concepts for competitive exams and job placements."
                 },
                 {
                     "role": "user",
@@ -144,23 +144,20 @@ def research_and_generate_questions_for_topic(topic: str, num_questions: int = 2
     # Step 1: Research the topic thoroughly
     print(f"📚 Step 1: Researching '{topic}'...")
     
-    research_prompt = f"""You are an educational expert. Provide comprehensive, detailed information about the following topic:
+    research_prompt = f"""You are an expert in exam and placement preparation. Provide in-depth, exam-oriented research on the topic: {topic}.
 
-Topic: {topic}
+Focus on content suitable for competitive exams and job interviews:
+1. Advanced definitions and nuanced concepts
+2. Key algorithms, frameworks, or methodologies with examples
+3. Common pitfalls, edge cases, and optimizations
+4. Real-world applications, case studies, and industry relevance
+5. Comparison with related concepts
+6. Potential interview/exam questions and tricky aspects
+7. Recent developments or best practices
 
-Provide a thorough explanation covering:
-1. Clear definition and core concepts
-2. Key components, elements, or aspects
-3. Important theories, frameworks, or methodologies
-4. Practical applications and real-world examples
-5. Benefits, challenges, and critical considerations
-6. Important terminology and concepts
+Provide 600-800 words of detailed, structured information that can be used to create challenging MCQs testing application, analysis, and synthesis."""
 
-Be detailed and educational. Provide at least 400-500 words of information that can be used to create excellent quiz questions.
-
-Your detailed explanation:"""
-
-    research_content = call_groq_api(research_prompt, max_tokens=2000, temperature=0.7)
+    research_content = call_groq_api(research_prompt, max_tokens=3000, temperature=0.6)
     
     if not research_content:
         print(f"⚠️ Research failed for '{topic}', using fallback")
@@ -172,41 +169,34 @@ Your detailed explanation:"""
     # Step 2: Generate questions from the research
     print(f"🧠 Step 2: Generating {num_questions} questions from research...")
     
-    quiz_prompt = f"""Based on the following comprehensive information about {topic}, create {num_questions} challenging multiple-choice questions.
+    quiz_prompt = f"""Using the following in-depth research on {topic}, generate EXACTLY {num_questions} challenging MCQs for exam/placement preparation.
 
-COMPREHENSIVE INFORMATION:
+RESEARCH:
 {research_content}
 
-Generate EXACTLY {num_questions} brilliant multiple-choice questions that:
-1. Test deep understanding of {topic}
-2. Are based ONLY on the information provided above
-3. Have 4 options each with realistic distractors
-4. Include detailed explanations
-5. Are clear, specific, and educational
+Each MCQ must:
+- Test advanced understanding: application, analysis, problem-solving, or edge cases
+- Be scenario-based, code-related (if applicable), or conceptual with depth
+- Have 4 options: 1 correct, 3 tricky distractors based on common misconceptions
+- Include a detailed explanation referencing the research, with why distractors are wrong
+- Vary question types: no repetition in style or focus
 
-CRITICAL: Return ONLY valid JSON with this EXACT structure:
+Return ONLY valid JSON:
 {{
   "questions": [
     {{
-      "question": "Specific question about {topic}",
-      "options": ["Correct answer", "Plausible distractor 1", "Plausible distractor 2", "Plausible distractor 3"],
+      "question": "Challenging question (e.g., 'In a scenario where..., what is the optimal approach for {topic}?')",
+      "options": ["Correct advanced answer", "Distractor based on common error", "Distractor from edge case", "Distractor from related concept"],
       "correct_answer": 0,
-      "explanation": "Detailed explanation based on the research",
+      "explanation": "In-depth explanation: why correct, why others wrong, reference research",
       "topic": "{topic}"
     }}
   ]
 }}
 
-Rules:
-- Questions must be directly answerable from the research above
-- Each question has EXACTLY 4 options
-- correct_answer is the index (0-3) of the correct option
-- Make distractors believable but clearly wrong
-- Explanations should reference the research content
+Ensure diversity and high difficulty for competitive prep."""
 
-Generate {num_questions} questions now:"""
-
-    quiz_response = call_groq_api(quiz_prompt, max_tokens=3000, temperature=0.8)
+    quiz_response = call_groq_api(quiz_prompt, max_tokens=4000, temperature=0.8)
     
     questions = []
     
@@ -246,15 +236,15 @@ Generate {num_questions} questions now:"""
     if not questions:
         print(f"⚠️ Using fallback question generation for '{topic}'")
         questions = [{
-            "question": f"What is the primary focus of {topic}?",
+            "question": f"What is a key challenge in applying {topic} in real-world scenarios?",
             "options": [
-                f"The strategic and comprehensive approach to {topic}",
-                f"{topic} is not relevant in modern practice",
-                f"{topic} has no practical applications",
-                "This concept is outdated"
+                f"Handling edge cases and optimizations in {topic}",
+                f"{topic} has no challenges",
+                f"{topic} is always straightforward",
+                "Ignore {topic} in practice"
             ],
             "correct_answer": 0,
-            "explanation": f"Based on research, {topic} focuses on comprehensive and strategic approaches.",
+            "explanation": f"Research shows {topic} involves complex edge cases.",
             "topic": topic
         }]
     
@@ -272,17 +262,19 @@ def research_and_generate_flashcards_for_topic(topic: str, num_cards: int = 2) -
     # Step 1: Research the topic
     print(f"🔬 Step 1: Researching '{topic}'...")
     
-    research_prompt = f"""Provide comprehensive information about: {topic}
+    research_prompt = f"""Provide exam-focused research on {topic} for placement and competitive prep.
 
-Cover:
-1. Definition and key concepts
-2. Important components and elements
-3. Practical applications
-4. Critical points to remember
+Include:
+1. Core definitions with nuances
+2. Key differences from similar concepts
+3. Applications, pros/cons, and optimizations
+4. Common exam traps and interview questions
+5. Mnemonics or memory aids if applicable
+6. Recent trends or advanced topics
 
-Provide detailed, educational content (400+ words):"""
+Deliver 600-800 words of structured, memorable content for flashcards."""
 
-    research_content = call_groq_api(research_prompt, max_tokens=2000, temperature=0.7)
+    research_content = call_groq_api(research_prompt, max_tokens=3000, temperature=0.6)
     
     if not research_content:
         research_content = f"{topic} is an important area of study with various applications and considerations."
@@ -292,33 +284,34 @@ Provide detailed, educational content (400+ words):"""
     # Step 2: Generate flashcards
     print(f"🎴 Step 2: Generating {num_cards} flashcards...")
     
-    flashcard_prompt = f"""Based on this comprehensive information about {topic}, create {num_cards} high-quality study flashcards.
+    flashcard_prompt = f"""From the research on {topic}, create EXACTLY {num_cards} diverse flashcards for exam/placement prep.
 
-INFORMATION:
+RESEARCH:
 {research_content}
 
-Generate EXACTLY {num_cards} flashcards that:
-1. Focus on key concepts from {topic}
-2. Have clear questions on the front
-3. Have comprehensive answers on the back
-4. Are directly based on the information above
+Each flashcard must:
+- Front: A key concept, term, difference, or scenario question
+- Back: Concise yet detailed answer with examples, pros/cons, or steps
+- Focus on memorization, quick recall, and application
+- Vary types: definitions, comparisons, processes, pitfalls
+- Differ from MCQs: no options, emphasize key facts/differences
 
-CRITICAL: Return ONLY valid JSON:
+Return ONLY valid JSON:
 {{
   "flashcards": [
     {{
-      "front": "Clear question about a key concept",
-      "back": "Comprehensive answer based on research",
-      "question": "Clear question about a key concept",
-      "answer": "Comprehensive answer based on research",
+      "front": "Key term or question (e.g., 'What are the key differences between {topic} and related concept?')",
+      "back": "Detailed, memorable answer with examples and tips",
+      "question": "Key term or question",
+      "answer": "Detailed, memorable answer with examples and tips",
       "topic": "{topic}"
     }}
   ]
 }}
 
-Generate {num_cards} flashcards now:"""
+Ensure no overlap with MCQ styles; prioritize unique, high-yield content."""
 
-    flashcard_response = call_groq_api(flashcard_prompt, max_tokens=3000, temperature=0.8)
+    flashcard_response = call_groq_api(flashcard_prompt, max_tokens=4000, temperature=0.8)
     
     flashcards = []
     
@@ -348,10 +341,10 @@ Generate {num_cards} flashcards now:"""
     if not flashcards:
         print(f"⚠️ Using fallback flashcard for '{topic}'")
         flashcards = [{
-            "front": f"What is {topic}?",
-            "back": f"{topic} is a crucial concept that involves strategic approaches and comprehensive understanding.",
-            "question": f"Define {topic}",
-            "answer": f"{topic} is a crucial concept that involves strategic approaches and comprehensive understanding.",
+            "front": f"Key differences in {topic}?",
+            "back": f"{topic} differs from similar concepts in applications and optimizations.",
+            "question": f"Key differences in {topic}?",
+            "answer": f"{topic} differs from similar concepts in applications and optimizations.",
             "topic": topic
         }]
     

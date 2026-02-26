@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'last_bench_home.dart';
 import 'forgot_password_flow.dart';
-
-
-
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -77,8 +75,8 @@ class _LoginPageState extends State<LoginPage> {
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
                     onPressed: () {
-  Navigator.pushNamed(context, '/landing');
-},
+                      Navigator.pushNamed(context, '/landing');
+                    },
 
                     icon: const Icon(Icons.arrow_back, color: navy),
                     label: const Text(
@@ -119,10 +117,7 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 8),
                 const Text(
                   "Sign in to continue your study journey",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: hintGrey,
-                  ),
+                  style: TextStyle(fontSize: 14, color: hintGrey),
                   textAlign: TextAlign.center,
                 ),
 
@@ -174,22 +169,16 @@ class _LoginPageState extends State<LoginPage> {
 
                           // Remember + Forgot
                           Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                
-                              ),
+                              Row(),
                               TextButton(
                                 onPressed: () {},
                                 child: const Text(
                                   "Forgot password?",
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: teal,
-                                  ),
+                                  style: TextStyle(fontSize: 13, color: teal),
                                 ),
-                              )
+                              ),
                             ],
                           ),
 
@@ -200,20 +189,16 @@ class _LoginPageState extends State<LoginPage> {
                             width: double.infinity,
                             height: 52,
                             child: ElevatedButton(
-                              onPressed:
-                                  isLoading ? null : submitLogin,
+                              onPressed: isLoading ? null : submitLogin,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: teal,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
                               child: Text(
-                                isLoading
-                                    ? "Signing In..."
-                                    : "Sign In",
+                                isLoading ? "Signing In..." : "Sign In",
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -236,10 +221,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const Text(
                       "New to Last Bench? ",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: hintGrey,
-                      ),
+                      style: TextStyle(fontSize: 14, color: hintGrey),
                     ),
                     GestureDetector(
                       onTap: () =>
@@ -280,13 +262,13 @@ class _LoginPageState extends State<LoginPage> {
   // ---------------- UI Helpers ----------------
 
   Widget _label(String text) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: navy,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      color: navy,
+    ),
+  );
 
   Widget _textField({
     required TextEditingController controller,
@@ -300,14 +282,10 @@ class _LoginPageState extends State<LoginPage> {
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: hintGrey),
         hintText: hint,
-        hintStyle: const TextStyle(
-          fontSize: 14,
-          color: hintGrey,
-        ),
+        hintStyle: const TextStyle(fontSize: 14, color: hintGrey),
         filled: true,
         fillColor: fieldBg,
-        contentPadding:
-            const EdgeInsets.symmetric(vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -332,26 +310,19 @@ class _LoginPageState extends State<LoginPage> {
       controller: controller,
       obscureText: !visible,
       decoration: InputDecoration(
-        prefixIcon:
-            const Icon(Icons.lock_outline, color: hintGrey),
+        prefixIcon: const Icon(Icons.lock_outline, color: hintGrey),
         suffixIcon: IconButton(
           icon: Icon(
-            visible
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
+            visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
             color: hintGrey,
           ),
           onPressed: toggle,
         ),
         hintText: hint,
-        hintStyle: const TextStyle(
-          fontSize: 14,
-          color: hintGrey,
-        ),
+        hintStyle: const TextStyle(fontSize: 14, color: hintGrey),
         filled: true,
         fillColor: fieldBg,
-        contentPadding:
-            const EdgeInsets.symmetric(vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
