@@ -7,12 +7,14 @@ class QuizAndFlashScreen extends StatefulWidget {
   final String sessionId;
   final Map<String, dynamic> quiz;
   final Map<String, dynamic> flashcards;
+  final String? difficulty;
 
   const QuizAndFlashScreen({
     Key? key,
     required this.sessionId,
     required this.quiz,
     required this.flashcards,
+    this.difficulty,
   }) : super(key: key);
 
   @override
@@ -92,6 +94,10 @@ class _QuizAndFlashScreenState extends State<QuizAndFlashScreen>
                           ),
                           textAlign: TextAlign.center,
                         ),
+                        if (widget.difficulty != null) ...[
+                          const SizedBox(height: 16),
+                          _buildDifficultyBadge(widget.difficulty!),
+                        ],
                       ],
                     ),
                   ),
@@ -155,6 +161,51 @@ class _QuizAndFlashScreenState extends State<QuizAndFlashScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDifficultyBadge(String difficulty) {
+    Color color;
+    String icon;
+
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        color = const Color(0xFF10B981);
+        icon = '📘';
+        break;
+      case 'hard':
+        color = const Color(0xFFEF4444);
+        icon = '🔥';
+        break;
+      case 'medium':
+      default:
+        color = const Color(0xFFF59E0B);
+        icon = '⚡';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        border: Border.all(color: color, width: 1.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Text(
+            'Difficulty: ${difficulty[0].toUpperCase()}${difficulty.substring(1)}',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

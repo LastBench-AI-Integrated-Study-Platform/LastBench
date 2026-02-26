@@ -54,7 +54,8 @@ async def upload_and_generate(
     file: UploadFile = File(...), 
     num_questions: int = 3, 
     num_flashcards: int = 3,
-    user_email: Optional[str] = Form(None)
+    user_email: Optional[str] = Form(None),
+    difficulty: str = Form("medium")
 ):
     """
     Upload file, extract text, and generate both quiz and flashcards.
@@ -85,8 +86,8 @@ async def upload_and_generate(
         final_text = aggressive_ocr_cleanup(text)
         
         # Generate quiz
-        print(f"🧠 Generating {num_questions} quiz questions...")
-        quiz_data = generate_mcq_quiz(final_text, num_questions)
+        print(f"🧠 Generating {num_questions} quiz questions... (Difficulty: {difficulty})")
+        quiz_data = generate_mcq_quiz(final_text, num_questions, difficulty=difficulty)
         
         # Generate flashcards
         print(f"📚 Generating {num_flashcards} flashcards...")
