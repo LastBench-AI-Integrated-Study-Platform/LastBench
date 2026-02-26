@@ -233,6 +233,7 @@ class _QuizSectionState extends State<QuizSection> {
   int score = 0;
   bool quizComplete = false;
   List<Map<String, dynamic>> results = [];
+  Set<int> skippedQuestions = {};
 
   @override
   void initState() {
@@ -291,6 +292,7 @@ class _QuizSectionState extends State<QuizSection> {
         'correctAnswer':
             question['options'][correctAnswerIndex], // Get the actual text
         'isCorrect': isCorrect,
+        'isSkipped': false,
       });
     });
   }
@@ -310,6 +312,24 @@ class _QuizSectionState extends State<QuizSection> {
     }
   }
 
+  void handleSkip() {
+    if (currentQuestion < quizQuestions.length - 1) {
+      setState(() {
+        skippedQuestions.add(currentQuestion);
+        currentQuestion++;
+        selectedAnswer = null;
+        isAnswered = false;
+      });
+    } else {
+      // Skip the last question
+      setState(() {
+        skippedQuestions.add(currentQuestion);
+        quizComplete = true;
+      });
+      _submitQuizAttempt();
+    }
+  }
+
   void handleRestart() {
     setState(() {
       currentQuestion = 0;
@@ -318,6 +338,7 @@ class _QuizSectionState extends State<QuizSection> {
       score = 0;
       quizComplete = false;
       results = [];
+      skippedQuestions.clear();
     });
   }
 
@@ -332,9 +353,27 @@ class _QuizSectionState extends State<QuizSection> {
           'user_answer': r['selectedAnswer'],
           'correct_answer': r['correctAnswer'],
           'is_correct': r['isCorrect'],
+          'is_skipped': r['isSkipped'] ?? false,
           'options': quizQuestions[idx]['options'],
         };
       }).toList();
+
+      // Add skipped questions to results
+      for (int i = 0; i < quizQuestions.length; i++) {
+        if (skippedQuestions.contains(i) && !results.asMap().containsKey(i)) {
+          answers.add({
+            'question_id': i,
+            'question': quizQuestions[i]['question'],
+            'user_answer': null,
+            'correct_answer': null,
+            'is_correct': false,
+            'is_skipped': true,
+            'options': quizQuestions[i]['options'],
+          });
+        }
+      }
+
+      final attemptedQuestions = quizQuestions.length - skippedQuestions.length;
 
       final response = await http.post(
         Uri.parse(AppConfig.quizAttemptEndpoint),
@@ -343,7 +382,9 @@ class _QuizSectionState extends State<QuizSection> {
           'session_id': widget.sessionId,
           'answers': answers,
           'score': score,
-          'total_questions': quizQuestions.length,
+          'total_questions': attemptedQuestions,
+          'attempted_questions': attemptedQuestions,
+          'skipped_questions': skippedQuestions.length,
         }),
       );
 
@@ -386,9 +427,17 @@ class _QuizSectionState extends State<QuizSection> {
               ),
               const SizedBox(height: 16),
               Text(
-                'You scored $score out of ${quizQuestions.length}',
+                'You scored $score out of ${quizQuestions.length - skippedQuestions.length}',
                 style: const TextStyle(fontSize: 18, color: Color(0xFF64748B)),
               ),
+              if (skippedQuestions.isNotEmpty)
+                Text(
+                  '(${skippedQuestions.length} question(s) skipped)',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFFF59E0B),
+                  ),
+                ),
               const SizedBox(height: 32),
               Container(
                 width: 160,
@@ -411,7 +460,7 @@ class _QuizSectionState extends State<QuizSection> {
                 ),
                 child: Center(
                   child: Text(
-                    '${((score / quizQuestions.length) * 100).round()}%',
+                    '${((quizQuestions.length - skippedQuestions.length) > 0 ? ((score / (quizQuestions.length - skippedQuestions.length)) * 100).round() : 0)}%',
                     style: const TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.bold,
@@ -447,15 +496,20 @@ class _QuizSectionState extends State<QuizSection> {
               ...results.asMap().entries.map((entry) {
                 final index = entry.key;
                 final result = entry.value;
+                final isSkipped = result['isSkipped'] ?? false;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: result['isCorrect']
+                    color: isSkipped
+                        ? const Color(0xFFF59E0B).withOpacity(0.1)
+                        : result['isCorrect']
                         ? const Color(0xFF379392).withOpacity(0.1)
                         : const Color(0xFFEF4444).withOpacity(0.1),
                     border: Border.all(
-                      color: result['isCorrect']
+                      color: isSkipped
+                          ? const Color(0xFFF59E0B)
+                          : result['isCorrect']
                           ? const Color(0xFF379392)
                           : const Color(0xFFEF4444),
                       width: 2,
@@ -473,7 +527,9 @@ class _QuizSectionState extends State<QuizSection> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: result['isCorrect']
+                              color: isSkipped
+                                  ? const Color(0xFFF59E0B)
+                                  : result['isCorrect']
                                   ? const Color(0xFF379392)
                                   : const Color(0xFFEF4444),
                               borderRadius: BorderRadius.circular(8),
@@ -489,21 +545,31 @@ class _QuizSectionState extends State<QuizSection> {
                           ),
                           const SizedBox(width: 8),
                           Icon(
-                            result['isCorrect']
+                            isSkipped
+                                ? Icons.skip_next
+                                : result['isCorrect']
                                 ? Icons.check_circle
                                 : Icons.cancel,
-                            color: result['isCorrect']
+                            color: isSkipped
+                                ? const Color(0xFFF59E0B)
+                                : result['isCorrect']
                                 ? const Color(0xFF379392)
                                 : const Color(0xFFEF4444),
                             size: 20,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            result['isCorrect'] ? 'Correct' : 'Incorrect',
+                            isSkipped
+                                ? 'Skipped'
+                                : result['isCorrect']
+                                ? 'Correct'
+                                : 'Incorrect',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: result['isCorrect']
+                              color: isSkipped
+                                  ? const Color(0xFFF59E0B)
+                                  : result['isCorrect']
                                   ? const Color(0xFF379392)
                                   : const Color(0xFFEF4444),
                             ),
@@ -519,32 +585,44 @@ class _QuizSectionState extends State<QuizSection> {
                           color: Color(0xFF0F172A),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Your answer: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              result['selectedAnswer'],
+                      if (!isSkipped) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Your answer: ',
                               style: TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: result['isCorrect']
-                                    ? const Color(0xFF379392)
-                                    : const Color(0xFFEF4444),
+                                color: Color(0xFF64748B),
                               ),
                             ),
+                            Expanded(
+                              child: Text(
+                                result['selectedAnswer'] ?? 'N/A',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: result['isCorrect']
+                                      ? const Color(0xFF379392)
+                                      : const Color(0xFFEF4444),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'This question was skipped and not counted in the score.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFFF59E0B),
+                            fontStyle: FontStyle.italic,
                           ),
-                        ],
-                      ),
-                      if (!result['isCorrect']) ...[
+                        ),
+                      ],
+                      if (!result['isCorrect'] && !isSkipped) ...[
                         const SizedBox(height: 4),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,7 +721,7 @@ class _QuizSectionState extends State<QuizSection> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Score: $score/${quizQuestions.length}',
+                  'Score: $score/${quizQuestions.length - skippedQuestions.length}${skippedQuestions.isNotEmpty ? ' (${skippedQuestions.length} skipped)' : ''}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -760,6 +838,26 @@ class _QuizSectionState extends State<QuizSection> {
           ),
 
           const SizedBox(height: 16),
+
+          // Skip Button
+          if (!isAnswered)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: handleSkip,
+                icon: const Icon(Icons.skip_next, size: 18),
+                label: const Text('Skip Question'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF59E0B),
+                  side: const BorderSide(color: Color(0xFFF59E0B), width: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
 
           // Submit/Next Button
           SizedBox(
@@ -878,7 +976,6 @@ class _FlashcardsSectionState extends State<FlashcardsSection> {
   @override
   Widget build(BuildContext context) {
     final card = flashcards[currentCard];
-
     return Column(
       children: [
         // Header
@@ -887,13 +984,18 @@ class _FlashcardsSectionState extends State<FlashcardsSection> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Card ${currentCard + 1} of ${flashcards.length}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Card ${currentCard + 1} of ${flashcards.length}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
               ),
               TextButton.icon(
                 onPressed: handleReset,
