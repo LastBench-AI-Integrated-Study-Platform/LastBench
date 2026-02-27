@@ -1,12 +1,14 @@
 // doubts_section.dart
-// Uses dart:html FileUploadInputElement directly — zero packages needed, works on Flutter Web!
-// No pubspec.yaml changes required.
+// Full backend integration with MongoDB
+// Displays doubts from database and stores all operations
 
 // ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/doubt_api_service.dart';
 
 // ─── Colour Palette ───────────────────────────────────────────────────────────
 const Color kBackground = Color(0xFFF5FAFA);
@@ -40,10 +42,6 @@ Future<Uint8List?> pickImageFromWeb() async {
     reader.readAsArrayBuffer(file);
     reader.onLoadEnd.listen((_) {
       final result = reader.result;
-      // depending on browser / dart2js output we may get either a
-      // ByteBuffer or a plain Uint8List. earlier code only handled
-      // ByteBuffer which meant the picker would silently return null
-      // even though a valid image was chosen.
       if (result is ByteBuffer) {
         completer.complete(result.asUint8List());
       } else if (result is Uint8List) {
@@ -54,10 +52,50 @@ Future<Uint8List?> pickImageFromWeb() async {
     });
   });
 
-  // If user closes dialog without picking
   input.onAbort.listen((_) => completer.complete(null));
 
   return completer.future;
+}
+
+// ─── User helpers ───────────────────────────────────────────────────────────
+Future<String> _loadUserName() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_name') ?? 'You';
+  } catch (_) {
+    return 'You';
+  }
+}
+
+String _avatarFromName(String name) {
+  if (name.trim().isEmpty) return '??';
+  final parts = name.trim().split(RegExp(r"\s+"));
+  if (parts.length == 1) {
+    return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+  }
+  final first = parts[0].isNotEmpty ? parts[0][0] : '';
+  final second = parts[1].isNotEmpty ? parts[1][0] : '';
+  return (first + second).toUpperCase();
+}
+
+// ─── Timestamp formatting helper ─────────────────────────────────────────────
+String formatTimestamp(String? iso) {
+  if (iso == null || iso.isEmpty) return 'Now';
+  try {
+    String normalized = iso;
+    final hasOffset =
+        iso.endsWith('Z') || iso.contains(RegExp(r'[+-]\d{2}:\d{2}'));
+    if (!hasOffset) normalized = iso + 'Z';
+
+    final dt = DateTime.parse(normalized).toLocal();
+    final dateStr = '${dt.day}/${dt.month}/${dt.year}';
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return 'date: $dateStr time: $hour12:$minute $ampm';
+  } catch (_) {
+    return iso;
+  }
 }
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
@@ -83,7 +121,7 @@ class Comment {
   final String authorAvatar;
   final String content;
   final String createdAt;
-  final List<Uint8List> imageBytes; // multiple user-uploaded images
+  final List<Uint8List> imageBytes;
   final List<Reply> replies;
   Comment({
     required this.id,
@@ -103,8 +141,8 @@ class Doubt {
   final String id;
   final String title;
   final String content;
-  final String? imageUrl; // network image (sample data)
-  final List<Uint8List> imageBytes; // multiple user-picked bytes via dart:html
+  final String? imageUrl;
+  final List<Uint8List> imageBytes;
   final String author;
   final String authorAvatar;
   final String subject;
@@ -199,9 +237,9 @@ String generateId() => (++_idCounter).toString();
 
 // ─── Helper: render image ─────────────────────────────────────────────────────
 
-Widget _buildDoubtImage(Doubt doubt, {double? height}) {
+Widget _buildDoubtImage(DoubtApiModel doubt, {double? height}) {
   final br = BorderRadius.circular(kRadius);
-  if (doubt.imageBytes.isNotEmpty) {
+  if (doubt.imageUrls != null && doubt.imageUrls!.isNotEmpty) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -210,26 +248,19 @@ Widget _buildDoubtImage(Doubt doubt, {double? height}) {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: doubt.imageBytes.length,
+      itemCount: doubt.imageUrls!.length,
       itemBuilder: (ctx, idx) => ClipRRect(
         borderRadius: br,
-        child: Image.memory(
-          doubt.imageBytes[idx],
+        child: Image.network(
+          'http://localhost:8000/${doubt.imageUrls![idx]}',
           height: height,
           width: double.infinity,
           fit: BoxFit.cover,
+          errorBuilder: (ctx, error, stackTrace) => Container(
+            color: kMuted,
+            child: const Icon(Icons.broken_image, color: kMutedForeground),
+          ),
         ),
-      ),
-    );
-  }
-  if (doubt.imageUrl != null) {
-    return ClipRRect(
-      borderRadius: br,
-      child: Image.network(
-        doubt.imageUrl!,
-        height: height,
-        width: double.infinity,
-        fit: BoxFit.cover,
       ),
     );
   }
@@ -245,28 +276,63 @@ class DoubtsSection extends StatefulWidget {
 }
 
 class _DoubtsSectionState extends State<DoubtsSection> {
-  List<Doubt> _doubts = List.from(initialDoubts);
+  List<DoubtApiModel> _doubts = [];
+  bool _isLoading = true;
+  bool _isCreating = false;
+
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
+  // FIX 1: Single initState that calls both _loadDoubts and _initializeUser
+  @override
+  void initState() {
+    super.initState();
+    _loadDoubts();
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
+  }
+
+  Future<void> _loadDoubts() async {
+    setState(() => _isLoading = true);
+    final doubts = await DoubtApiService.getAllDoubts();
+    if (mounted) {
+      setState(() {
+        _doubts = doubts ?? [];
+        _isLoading = false;
+      });
+    }
+  }
 
   void _openNewDoubtDialog() {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.4),
       builder: (ctx) => _NewDoubtDialog(
-        onSubmit: (doubt) => setState(() => _doubts.insert(0, doubt)),
+        onSubmit: (doubt) async {
+          setState(() => _isCreating = true);
+          await _loadDoubts();
+          setState(() => _isCreating = false);
+        },
       ),
     );
   }
 
-  void _openDoubtDetail(Doubt doubt) {
+  void _openDoubtDetail(DoubtApiModel doubt) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => _DoubtDetailPage(
           doubt: doubt,
           onUpdated: (updated) {
-            setState(() {
-              final i = _doubts.indexWhere((d) => d.id == updated.id);
-              if (i != -1) _doubts[i] = updated;
-            });
+            _loadDoubts();
           },
         ),
       ),
@@ -317,26 +383,38 @@ class _DoubtsSectionState extends State<DoubtsSection> {
               ],
             ),
           ),
-          ...List.generate(_doubts.length, (i) {
-            final doubt = _doubts[i];
-            return Padding(
-              padding: EdgeInsets.only(bottom: i < _doubts.length - 1 ? 16 : 0),
-              child: _DoubtCard(
-                doubt: doubt,
-                onTap: () => _openDoubtDetail(doubt),
-              ),
-            );
-          }),
-          if (_doubts.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Text(
-                  'No doubts yet. Post the first one!',
-                  style: TextStyle(color: kMutedForeground, fontSize: 14),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator(color: kPrimary)),
+            )
+          else ...[
+            ...List.generate(_doubts.length, (i) {
+              final doubt = _doubts[i];
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: i < _doubts.length - 1 ? 16 : 0,
+                ),
+                // FIX 2: Pass currentUserName and currentUserAvatar to _DoubtCard
+                child: _DoubtCard(
+                  doubt: doubt,
+                  onTap: () => _openDoubtDetail(doubt),
+                  currentUserName: _currentUserName,
+                  currentUserAvatar: _currentUserAvatar,
+                ),
+              );
+            }),
+            if (_doubts.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    'No doubts yet. Post the first one!',
+                    style: TextStyle(color: kMutedForeground, fontSize: 14),
+                  ),
                 ),
               ),
-            ),
+          ],
         ],
       ),
     );
@@ -346,9 +424,16 @@ class _DoubtsSectionState extends State<DoubtsSection> {
 // ─── Doubt Card ───────────────────────────────────────────────────────────────
 
 class _DoubtCard extends StatelessWidget {
-  final Doubt doubt;
+  final DoubtApiModel doubt;
   final VoidCallback onTap;
-  const _DoubtCard({required this.doubt, required this.onTap});
+  final String currentUserName;
+  final String currentUserAvatar;
+  const _DoubtCard({
+    required this.doubt,
+    required this.onTap,
+    required this.currentUserName,
+    required this.currentUserAvatar,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +456,12 @@ class _DoubtCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Avatar(initials: doubt.authorAvatar, size: 40),
+            _Avatar(
+              initials: (doubt.authorAvatar ?? '').toUpperCase() == 'YO'
+                  ? currentUserAvatar
+                  : (doubt.authorAvatar ?? '??'),
+              size: 40,
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -385,7 +475,7 @@ class _DoubtCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              doubt.title,
+                              doubt.title ?? '',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -394,7 +484,7 @@ class _DoubtCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${doubt.author} • ${doubt.createdAt}',
+                              '${(doubt.author ?? '').toLowerCase() == 'you' ? currentUserName : (doubt.author ?? '')} • ${formatTimestamp(doubt.createdAt)}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: kMutedForeground,
@@ -404,12 +494,12 @@ class _DoubtCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _Badge(label: doubt.subject),
+                      _Badge(label: doubt.subject ?? ''),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    doubt.content,
+                    doubt.content ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -418,7 +508,7 @@ class _DoubtCard extends StatelessWidget {
                       height: 1.4,
                     ),
                   ),
-                  if (doubt.hasImage) ...[
+                  if (doubt.hasImage == true) ...[
                     const SizedBox(height: 12),
                     _buildDoubtImage(doubt, height: 128),
                   ],
@@ -432,7 +522,7 @@ class _DoubtCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${doubt.comments.length} answers',
+                        '${(doubt.comments ?? []).length} answers',
                         style: const TextStyle(
                           fontSize: 13,
                           color: kMutedForeground,
@@ -453,7 +543,7 @@ class _DoubtCard extends StatelessWidget {
 // ─── New Doubt Dialog ─────────────────────────────────────────────────────────
 
 class _NewDoubtDialog extends StatefulWidget {
-  final void Function(Doubt) onSubmit;
+  final void Function(DoubtApiModel?) onSubmit;
   const _NewDoubtDialog({required this.onSubmit});
   @override
   State<_NewDoubtDialog> createState() => _NewDoubtDialogState();
@@ -466,11 +556,30 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
   List<Uint8List> _imageBytes = [];
   bool _isPickingImage = false;
 
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
+  }
+
   Future<void> _pickImage() async {
     if (_isPickingImage) return;
     setState(() => _isPickingImage = true);
     try {
-      final bytes = await pickImageFromWeb(); // ← uses dart:html directly
+      final bytes = await pickImageFromWeb();
       if (bytes != null && mounted) {
         setState(() => _imageBytes.add(bytes));
       }
@@ -492,24 +601,79 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
     setState(() => _imageBytes.removeAt(index));
   }
 
-  void _submit() {
-    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty)
+  Future<void> _submit() async {
+    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill title and description')),
+      );
       return;
-    widget.onSubmit(
-      Doubt(
-        id: generateId(),
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      List<String> uploadedImageUrls = [];
+      if (_imageBytes.isNotEmpty) {
+        for (int i = 0; i < _imageBytes.length; i++) {
+          final url = await DoubtApiService.uploadImage(
+            _imageBytes[i],
+            'doubt_image_$i.jpg',
+          );
+          if (url != null) {
+            uploadedImageUrls.add(url);
+          }
+        }
+      }
+
+      final doubt = await DoubtApiService.createDoubt(
         title: _titleCtrl.text.trim(),
         content: _contentCtrl.text.trim(),
-        imageBytes: _imageBytes,
-        author: 'You',
-        authorAvatar: 'YO',
         subject: _subjectCtrl.text.trim().isEmpty
             ? 'General'
             : _subjectCtrl.text.trim(),
-        createdAt: 'Just now',
-      ),
-    );
-    Navigator.of(context).pop();
+        author: _currentUserName,
+        authorAvatar: _currentUserAvatar,
+        imageUrls: uploadedImageUrls,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (doubt != null) {
+        widget.onSubmit(doubt);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Doubt posted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create doubt'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   @override
@@ -710,15 +874,15 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
 // ─── Doubt Detail Page ────────────────────────────────────────────────────────
 
 class _DoubtDetailPage extends StatefulWidget {
-  final Doubt doubt;
-  final void Function(Doubt) onUpdated;
+  final DoubtApiModel doubt;
+  final void Function(DoubtApiModel) onUpdated;
   const _DoubtDetailPage({required this.doubt, required this.onUpdated});
   @override
   State<_DoubtDetailPage> createState() => _DoubtDetailPageState();
 }
 
 class _DoubtDetailPageState extends State<_DoubtDetailPage> {
-  late Doubt _doubt;
+  late DoubtApiModel _doubt;
   final _commentCtrl = TextEditingController();
   List<Uint8List> _commentImageBytes = [];
   bool _isPickingCommentImage = false;
@@ -726,10 +890,25 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
   final _replyCtrl = TextEditingController();
   final Set<String> _expandedReplies = {};
 
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
+  // FIX 3: Single initState that calls both _initializeUser and sets _doubt
   @override
   void initState() {
     super.initState();
     _doubt = widget.doubt;
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
   }
 
   Future<void> _pickCommentImage() async {
@@ -758,45 +937,116 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
     setState(() => _commentImageBytes.removeAt(index));
   }
 
-  void _addComment() {
+  Future<void> _addComment() async {
     if (_commentCtrl.text.trim().isEmpty && _commentImageBytes.isEmpty) return;
-    setState(() {
-      _doubt.comments.add(
-        Comment(
-          id: generateId(),
-          author: 'You',
-          authorAvatar: 'YO',
-          content: _commentCtrl.text.trim(),
-          createdAt: 'Just now',
-          imageBytes: _commentImageBytes,
-        ),
+
+    final commentText = _commentCtrl.text.trim();
+    final imagesToUpload = List<Uint8List>.from(_commentImageBytes);
+
+    _commentCtrl.clear();
+    _commentImageBytes = [];
+    setState(() {});
+
+    try {
+      List<String> uploadedImageUrls = [];
+      for (int i = 0; i < imagesToUpload.length; i++) {
+        final url = await DoubtApiService.uploadImage(
+          imagesToUpload[i],
+          'comment_image_$i.jpg',
+        );
+        if (url != null) {
+          uploadedImageUrls.add(url);
+        }
+      }
+
+      final comment = await DoubtApiService.addComment(
+        widget.doubt.id ?? '',
+        author: _currentUserName,
+        authorAvatar: _currentUserAvatar,
+        content: commentText,
+        imageUrls: uploadedImageUrls,
       );
-      _commentCtrl.clear();
-      _commentImageBytes = [];
-    });
-    widget.onUpdated(_doubt);
+
+      if (comment != null && mounted) {
+        final updated = await DoubtApiService.getDoubtById(
+          widget.doubt.id ?? '',
+        );
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment added successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add comment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
-  void _addReply(String commentId) {
+  Future<void> _addReply(String commentId) async {
     if (_replyCtrl.text.trim().isEmpty) return;
+
+    final replyText = _replyCtrl.text.trim();
+
+    _replyCtrl.clear();
     setState(() {
-      _doubt.comments
-          .firstWhere((c) => c.id == commentId)
-          .replies
-          .add(
-            Reply(
-              id: generateId(),
-              author: 'You',
-              authorAvatar: 'YO',
-              content: _replyCtrl.text.trim(),
-              createdAt: 'Just now',
-            ),
-          );
-      _replyCtrl.clear();
       _replyingTo = null;
       _expandedReplies.add(commentId);
     });
-    widget.onUpdated(_doubt);
+
+    try {
+      final reply = await DoubtApiService.addReply(
+        widget.doubt.id ?? '',
+        commentId,
+        author: _currentUserName,
+        authorAvatar: _currentUserAvatar,
+        content: replyText,
+      );
+
+      if (reply != null && mounted) {
+        final updated = await DoubtApiService.getDoubtById(
+          widget.doubt.id ?? '',
+        );
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reply added successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add reply'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   @override
@@ -835,7 +1085,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Avatar(initials: _doubt.authorAvatar, size: 48),
+                      _Avatar(initials: _doubt.authorAvatar ?? '??', size: 48),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Row(
@@ -846,7 +1096,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _doubt.title,
+                                    _doubt.title ?? '',
                                     style: const TextStyle(
                                       fontSize: 17,
                                       fontWeight: FontWeight.w600,
@@ -858,7 +1108,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                     spacing: 6,
                                     children: [
                                       Text(
-                                        _doubt.author,
+                                        _doubt.author ?? '',
                                         style: const TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
@@ -867,10 +1117,10 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                       ),
                                       _MonoBadge(
                                         label:
-                                            '@${_doubt.authorAvatar.toLowerCase()}',
+                                            '@${(_doubt.authorAvatar ?? '').toLowerCase()}',
                                       ),
                                       Text(
-                                        '• ${_doubt.createdAt}',
+                                        '• ${formatTimestamp(_doubt.createdAt)}',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: kMutedForeground,
@@ -882,7 +1132,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _Badge(label: _doubt.subject),
+                            _Badge(label: _doubt.subject ?? ''),
                           ],
                         ),
                       ),
@@ -890,14 +1140,14 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _doubt.content,
+                    _doubt.content ?? '',
                     style: const TextStyle(
                       fontSize: 14,
                       color: kForeground,
                       height: 1.6,
                     ),
                   ),
-                  if (_doubt.hasImage) ...[
+                  if (_doubt.hasImage == true) ...[
                     const SizedBox(height: 16),
                     _buildDoubtImage(_doubt),
                   ],
@@ -911,7 +1161,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${_doubt.comments.length} answers',
+                        '${(_doubt.comments?.length) ?? 0} answers',
                         style: const TextStyle(
                           fontSize: 13,
                           color: kMutedForeground,
@@ -940,7 +1190,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _Avatar(initials: 'YO', size: 32),
+                      _Avatar(initials: _currentUserAvatar, size: 32),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -952,7 +1202,6 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                             ),
                             const SizedBox(height: 8),
 
-                            // image picker for multiple answer images
                             Column(
                               children: [
                                 if (_commentImageBytes.isNotEmpty)
@@ -1106,7 +1355,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
             const SizedBox(height: 24),
 
             Text(
-              '${_doubt.comments.length} ${_doubt.comments.length == 1 ? "Answer" : "Answers"}',
+              '${((_doubt.comments?.length) ?? 0)} ${((_doubt.comments?.length) ?? 0) == 1 ? "Answer" : "Answers"}',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -1115,7 +1364,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
             ),
             const SizedBox(height: 12),
 
-            if (_doubt.comments.isEmpty)
+            if ((_doubt.comments?.isEmpty) ?? true)
               _CardContainer(
                 child: const Column(
                   children: [
@@ -1135,13 +1384,13 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                 ),
               ),
 
-            ...List.generate(_doubt.comments.length, (i) {
-              final comment = _doubt.comments[i];
+            ...List.generate((_doubt.comments?.length) ?? 0, (i) {
+              final comment = (_doubt.comments ?? [])[i];
               final isReplying = _replyingTo == comment.id;
               final repliesExpanded = _expandedReplies.contains(comment.id);
               return Padding(
                 padding: EdgeInsets.only(
-                  bottom: i < _doubt.comments.length - 1 ? 16 : 0,
+                  bottom: i < ((_doubt.comments?.length) ?? 0) - 1 ? 16 : 0,
                 ),
                 child: _CardContainer(
                   child: Row(
@@ -1156,7 +1405,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                         ),
                         child: Center(
                           child: Text(
-                            comment.authorAvatar,
+                            comment.authorAvatar ?? '??',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -1175,7 +1424,9 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Text(
-                                  comment.author,
+                                  (comment.author ?? '').toLowerCase() == 'you'
+                                      ? _currentUserName
+                                      : (comment.author ?? ''),
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -1184,10 +1435,10 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                 ),
                                 _MonoBadge(
                                   label:
-                                      '@${comment.authorAvatar.toLowerCase()}',
+                                      '@${((comment.authorAvatar ?? '').toUpperCase() == 'YO' ? _currentUserAvatar : (comment.authorAvatar ?? '')).toLowerCase()}',
                                 ),
                                 Text(
-                                  comment.createdAt,
+                                  formatTimestamp(comment.createdAt),
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: kMutedForeground,
@@ -1197,16 +1448,15 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              comment.content,
+                              comment.content ?? '',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: kForeground,
                                 height: 1.5,
                               ),
                             ),
-                            if (comment.imageBytes.isNotEmpty) ...[
+                            if ((comment.imageUrls?.isNotEmpty) ?? false) ...[
                               const SizedBox(height: 8),
-                              // display multiple images in grid
                               GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -1216,12 +1466,18 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                       crossAxisSpacing: 8,
                                       mainAxisSpacing: 8,
                                     ),
-                                itemCount: comment.imageBytes.length,
+                                itemCount: (comment.imageUrls?.length) ?? 0,
                                 itemBuilder: (ctx, idx) => ClipRRect(
                                   borderRadius: BorderRadius.circular(kRadius),
-                                  child: Image.memory(
-                                    comment.imageBytes[idx],
+                                  child: Image.network(
+                                    'http://localhost:8000/${comment.imageUrls?[idx] ?? ''}',
                                     fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: kMutedForeground.withOpacity(0.2),
+                                      child: const Icon(
+                                        Icons.image_not_supported,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1238,18 +1494,22 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                         : comment.id,
                                   ),
                                 ),
-                                if (comment.replies.isNotEmpty) ...[
+                                if ((comment.replies?.isNotEmpty) ?? false) ...[
                                   const SizedBox(width: 8),
                                   _GhostButton(
                                     icon: repliesExpanded
                                         ? Icons.expand_less
                                         : Icons.expand_more,
                                     label:
-                                        '${comment.replies.length} ${comment.replies.length == 1 ? "reply" : "replies"}',
+                                        '${(comment.replies?.length) ?? 0} ${((comment.replies?.length) ?? 0) == 1 ? "reply" : "replies"}',
                                     onTap: () => setState(
                                       () => repliesExpanded
-                                          ? _expandedReplies.remove(comment.id)
-                                          : _expandedReplies.add(comment.id),
+                                          ? _expandedReplies.remove(
+                                              comment.id ?? '',
+                                            )
+                                          : _expandedReplies.add(
+                                              comment.id ?? '',
+                                            ),
                                     ),
                                   ),
                                 ],
@@ -1260,7 +1520,10 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const _Avatar(initials: 'YO', size: 28),
+                                  _Avatar(
+                                    initials: _currentUserAvatar,
+                                    size: 28,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Column(
@@ -1292,7 +1555,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                             const SizedBox(width: 8),
                                             ElevatedButton(
                                               onPressed: () =>
-                                                  _addReply(comment.id),
+                                                  _addReply(comment.id ?? ''),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: kPrimary,
                                                 foregroundColor:
@@ -1324,7 +1587,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               ),
                             ],
                             if (repliesExpanded &&
-                                comment.replies.isNotEmpty) ...[
+                                ((comment.replies?.isNotEmpty) ?? false)) ...[
                               const SizedBox(height: 16),
                               Container(
                                 decoration: const BoxDecoration(
@@ -1335,12 +1598,16 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                 padding: const EdgeInsets.only(left: 16),
                                 child: Column(
                                   children: List.generate(
-                                    comment.replies.length,
+                                    (comment.replies?.length) ?? 0,
                                     (j) {
-                                      final reply = comment.replies[j];
+                                      final reply = (comment.replies ?? [])[j];
                                       return Padding(
                                         padding: EdgeInsets.only(
-                                          bottom: j < comment.replies.length - 1
+                                          bottom:
+                                              j <
+                                                  ((comment.replies?.length) ??
+                                                          0) -
+                                                      1
                                               ? 12
                                               : 0,
                                         ),
@@ -1358,7 +1625,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                               ),
                                               child: Center(
                                                 child: Text(
-                                                  reply.authorAvatar,
+                                                  reply.authorAvatar ?? '??',
                                                   style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.w600,
@@ -1377,7 +1644,12 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                                     spacing: 6,
                                                     children: [
                                                       Text(
-                                                        reply.author,
+                                                        (reply.author ?? '')
+                                                                    .toLowerCase() ==
+                                                                'you'
+                                                            ? _currentUserName
+                                                            : (reply.author ??
+                                                                  ''),
                                                         style: const TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
@@ -1387,10 +1659,12 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                                       ),
                                                       _MonoBadge(
                                                         label:
-                                                            '@${reply.authorAvatar.toLowerCase()}',
+                                                            '@${((reply.authorAvatar ?? '').toUpperCase() == 'YO' ? _currentUserAvatar : (reply.authorAvatar ?? '')).toLowerCase()}',
                                                       ),
                                                       Text(
-                                                        reply.createdAt,
+                                                        formatTimestamp(
+                                                          reply.createdAt,
+                                                        ),
                                                         style: const TextStyle(
                                                           fontSize: 10,
                                                           color:
@@ -1401,7 +1675,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    reply.content,
+                                                    reply.content ?? '',
                                                     style: const TextStyle(
                                                       fontSize: 12,
                                                       color: kForeground,
