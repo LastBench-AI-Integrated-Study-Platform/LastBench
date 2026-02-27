@@ -4,7 +4,7 @@ import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
 import 'chat_home_page.dart';
-import 'doubt_section.dart'; // ← imported
+import 'doubt_section.dart';
 
 class LastBenchHome extends StatefulWidget {
   final String? userName;
@@ -18,6 +18,27 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   // Colors
   static const Color navy = Color(0xFF033F63);
   static const Color teal = Color(0xFF379392);
+
+  // ── Scroll controller + key for Doubts Section ──
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _doubtsSectionKey = GlobalKey();
+
+  void _scrollToDoubts() {
+    final ctx = _doubtsSectionKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   // Quick actions
   final List<Map<String, dynamic>> quickActions = [
@@ -89,11 +110,12 @@ class _LastBenchHomeState extends State<LastBenchHome> {
 
       floatingActionButton: FloatingActionButton(
         backgroundColor: teal,
-        onPressed: () {},
+        onPressed: _scrollToDoubts,
         child: const Icon(Icons.help_outline),
       ),
 
       body: SingleChildScrollView(
+        controller: _scrollController, // ← attached
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -197,6 +219,9 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                               builder: (context) => const ChatHomePage(),
                             ),
                           );
+                        } else if (action["title"] == "Ask a Doubt") {
+                          // ← scroll to doubts section
+                          _scrollToDoubts();
                         }
                       },
                       child: Card(
@@ -384,9 +409,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
             ),
 
             // ── Doubts Section ────────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: DoubtsSection(),
+            Padding(
+              key: _doubtsSectionKey, // ← GlobalKey attached here
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: const DoubtsSection(),
             ),
 
             const SizedBox(height: 80),

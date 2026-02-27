@@ -267,6 +267,10 @@ Widget _buildDoubtImage(DoubtApiModel doubt, {double? height}) {
   return const SizedBox.shrink();
 }
 
+// ─── Tab enum ────────────────────────────────────────────────────────────────
+
+enum _DoubtTab { personal, others }
+
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 
 class DoubtsSection extends StatefulWidget {
@@ -283,12 +287,27 @@ class _DoubtsSectionState extends State<DoubtsSection> {
   String _currentUserName = 'You';
   String _currentUserAvatar = 'YO';
 
-  // FIX 1: Single initState that calls both _loadDoubts and _initializeUser
+  // ── Toggle & Search state ──
+  _DoubtTab _activeTab = _DoubtTab.personal;
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
     _loadDoubts();
     _initializeUser();
+    _searchCtrl.addListener(() {
+      if (mounted) {
+        setState(() => _searchQuery = _searchCtrl.text.trim().toLowerCase());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeUser() async {
@@ -310,6 +329,43 @@ class _DoubtsSectionState extends State<DoubtsSection> {
         _isLoading = false;
       });
     }
+  }
+
+  /// Returns doubts filtered by active tab and search query.
+  List<DoubtApiModel> get _filteredDoubts {
+    if (_doubts.isEmpty) return [];
+
+    final currentNameLower = (_currentUserName.isNotEmpty)
+        ? _currentUserName.toLowerCase()
+        : 'you';
+
+    List<DoubtApiModel> tabFiltered;
+
+    if (_activeTab == _DoubtTab.personal) {
+      tabFiltered = _doubts.where((d) {
+        final author = (d.author ?? '').toLowerCase().trim();
+        return author == currentNameLower || author == 'you';
+      }).toList();
+    } else {
+      tabFiltered = _doubts.where((d) {
+        final author = (d.author ?? '').toLowerCase().trim();
+        return author != currentNameLower && author != 'you';
+      }).toList();
+    }
+
+    final query = _searchQuery.trim();
+    if (query.isEmpty) return tabFiltered;
+
+    return tabFiltered.where((d) {
+      final title = (d.title ?? '').toLowerCase();
+      final content = (d.content ?? '').toLowerCase();
+      final subject = (d.subject ?? '').toLowerCase();
+      final author = (d.author ?? '').toLowerCase();
+      return title.contains(query) ||
+          content.contains(query) ||
+          subject.contains(query) ||
+          author.contains(query);
+    }).toList();
   }
 
   void _openNewDoubtDialog() {
@@ -341,11 +397,14 @@ class _DoubtsSectionState extends State<DoubtsSection> {
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredDoubts;
+
     return Container(
       color: kBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header row ──
           Padding(
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
             child: Row(
@@ -383,19 +442,31 @@ class _DoubtsSectionState extends State<DoubtsSection> {
               ],
             ),
           ),
+
+          // ── Toggle tabs ──
+          _ToggleTabs(
+            activeTab: _activeTab,
+            onTabChanged: (tab) => setState(() => _activeTab = tab),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Search bar ──
+          _SearchBar(controller: _searchCtrl),
+          const SizedBox(height: 16),
+
+          // ── Content ──
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(child: CircularProgressIndicator(color: kPrimary)),
             )
           else ...[
-            ...List.generate(_doubts.length, (i) {
-              final doubt = _doubts[i];
+            ...List.generate(filtered.length, (i) {
+              final doubt = filtered[i];
               return Padding(
                 padding: EdgeInsets.only(
-                  bottom: i < _doubts.length - 1 ? 16 : 0,
+                  bottom: i < filtered.length - 1 ? 16 : 0,
                 ),
-                // FIX 2: Pass currentUserName and currentUserAvatar to _DoubtCard
                 child: _DoubtCard(
                   doubt: doubt,
                   onTap: () => _openDoubtDetail(doubt),
@@ -404,18 +475,174 @@ class _DoubtsSectionState extends State<DoubtsSection> {
                 ),
               );
             }),
-            if (_doubts.isEmpty)
-              const Center(
+            if (filtered.isEmpty)
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Text(
-                    'No doubts yet. Post the first one!',
-                    style: TextStyle(color: kMutedForeground, fontSize: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _searchQuery.isNotEmpty
+                            ? Icons.search_off
+                            : _activeTab == _DoubtTab.personal
+                            ? Icons.person_outline
+                            : Icons.group_outlined,
+                        size: 40,
+                        color: kMutedForeground,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _searchQuery.isNotEmpty
+                            ? 'No doubts match "$_searchQuery"'
+                            : _activeTab == _DoubtTab.personal
+                            ? 'You haven\'t posted any doubts yet.'
+                            : 'No doubts from others yet.',
+                        style: const TextStyle(
+                          color: kMutedForeground,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ─── Toggle Tabs Widget ───────────────────────────────────────────────────────
+
+class _ToggleTabs extends StatelessWidget {
+  final _DoubtTab activeTab;
+  final void Function(_DoubtTab) onTabChanged;
+
+  const _ToggleTabs({required this.activeTab, required this.onTabChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFFECF0F0),
+        borderRadius: BorderRadius.circular(50),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _TabItem(
+            label: 'My Doubts',
+            icon: Icons.person_outline,
+            isActive: activeTab == _DoubtTab.personal,
+            onTap: () => onTabChanged(_DoubtTab.personal),
+          ),
+          _TabItem(
+            label: 'Others',
+            icon: Icons.group_outlined,
+            isActive: activeTab == _DoubtTab.others,
+            onTap: () => onTabChanged(_DoubtTab.others),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _TabItem({
+    required this.label,
+    required this.icon,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? kForeground : Colors.transparent,
+          borderRadius: BorderRadius.circular(50),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isActive ? Colors.white : kMutedForeground,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive ? Colors.white : kMutedForeground,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Search Bar Widget ────────────────────────────────────────────────────────
+
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  const _SearchBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 14, color: kForeground),
+      decoration: InputDecoration(
+        hintText: 'Search doubts by title, subject, or author...',
+        hintStyle: const TextStyle(fontSize: 13, color: kMutedForeground),
+        prefixIcon: const Icon(Icons.search, size: 20, color: kMutedForeground),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (_, value, __) => value.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close,
+                    size: 18,
+                    color: kMutedForeground,
+                  ),
+                  onPressed: () => controller.clear(),
+                )
+              : const SizedBox.shrink(),
+        ),
+        filled: true,
+        fillColor: kCard,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: kBorder, width: 1),
+          borderRadius: BorderRadius.circular(kRadius),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: kPrimary, width: 1.5),
+          borderRadius: BorderRadius.circular(kRadius),
+        ),
       ),
     );
   }
@@ -893,7 +1120,6 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
   String _currentUserName = 'You';
   String _currentUserAvatar = 'YO';
 
-  // FIX 3: Single initState that calls both _initializeUser and sets _doubt
   @override
   void initState() {
     super.initState();
