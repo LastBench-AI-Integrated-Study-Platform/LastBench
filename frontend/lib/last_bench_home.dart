@@ -3,7 +3,7 @@ import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
-
+import 'chat_home_page.dart';
 
 class LastBenchHome extends StatefulWidget {
   const LastBenchHome({super.key});
@@ -31,6 +31,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
     {
       "icon": Icons.chat,
       "title": "Chat with Group",
+      "subtitle" :"Discuss topics and share ideas",
       "badge": "4",
       "color": navy,
     },
@@ -193,6 +194,14 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       ),
     );
   }
+  else if (action["title"] == "Chat with Group") {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const ChatHomePage(),
+    ),
+  );
+}
 },
 
 
@@ -367,7 +376,10 @@ const Padding(
                                 ),
                               ),
                               onPressed: () {},
-                              child: const Text("Join"),
+                              child: const Text("Join",style: const TextStyle(
+                                          
+                                          color: Colors.white,
+                                        ),),
                             ),
                           ],
                         ),
