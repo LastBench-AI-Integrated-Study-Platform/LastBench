@@ -33,6 +33,7 @@ __pycache__/
 *.pyo
 *.pyd
 .env
+backend/.env
 
 # =========================
 # Backend specific
@@ -72,3 +73,4 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+

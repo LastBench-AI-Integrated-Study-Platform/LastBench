@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
@@ -53,7 +53,9 @@ class QuizAttemptRequest(BaseModel):
 async def upload_and_generate(
     file: UploadFile = File(...), 
     num_questions: int = 3, 
-    num_flashcards: int = 3
+    num_flashcards: int = 3,
+    user_email: Optional[str] = Form(None),
+    difficulty: str = Form("medium")
 ):
     """
     Upload file, extract text, and generate both quiz and flashcards.
@@ -84,8 +86,8 @@ async def upload_and_generate(
         final_text = aggressive_ocr_cleanup(text)
         
         # Generate quiz
-        print(f"🧠 Generating {num_questions} quiz questions...")
-        quiz_data = generate_mcq_quiz(final_text, num_questions)
+        print(f"🧠 Generating {num_questions} quiz questions... (Difficulty: {difficulty})")
+        quiz_data = generate_mcq_quiz(final_text, num_questions, difficulty=difficulty)
         
         # Generate flashcards
         print(f"📚 Generating {num_flashcards} flashcards...")
@@ -134,7 +136,8 @@ async def upload_and_generate(
             "session_id": session_id,
             "questions": processed_quiz,
             "text": final_text,
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
+            "user_email": user_email
         }
         quiz_sessions_collection.insert_one(quiz_session_doc)
         
@@ -142,7 +145,8 @@ async def upload_and_generate(
             "session_id": session_id,
             "cards": processed_flashcards,
             "text": final_text,
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
+            "user_email": user_email
         }
         flashcard_sessions_collection.insert_one(flashcard_session_doc)
         
@@ -307,11 +311,17 @@ def flashcards(req: GenerateRequest):
 # ============================================================================
 
 @router.get("/upload/sessions/history")
-def get_sessions_history():
-    """Retrieve all quiz sessions with their creation time for history view."""
+def get_sessions_history(email: Optional[str] = Query(None)):
+    """Retrieve quiz sessions with their creation time for history view.
+    If an email query parameter is provided, only return sessions created by that user."""
     try:
-        # Use aggregation pipeline to properly handle text truncation
-        pipeline = [
+        # Build pipeline with optional filtering by user email
+        pipeline = []
+
+        if email:
+            pipeline.append({"$match": {"user_email": email}})
+
+        pipeline.extend([
             {
                 "$project": {
                     "session_id": 1,
@@ -319,6 +329,7 @@ def get_sessions_history():
                     "text": {
                         "$substr": ["$text", 0, 100]
                     },
+                    "user_email": 1,
                     "_id": 0
                 }
             },
@@ -327,12 +338,12 @@ def get_sessions_history():
                     "created_at": -1
                 }
             }
-        ]
-        
+        ])
+
         sessions = list(quiz_sessions_collection.aggregate(pipeline))
-        
-        print(f"✅ Retrieved {len(sessions)} sessions from history")
-        
+
+        print(f"✅ Retrieved {len(sessions)} sessions from history (email filter: {email})")
+
         return {
             "sessions": sessions,
             "total": len(sessions)
@@ -348,14 +359,19 @@ def get_sessions_history():
 
 
 @router.get("/upload/sessions/{session_id}/full")
-def get_session_full_details(session_id: str):
-    """Retrieve complete session details including quiz and flashcards."""
+def get_session_full_details(session_id: str, email: Optional[str] = Query(None)):
+    """Retrieve complete session details including quiz and flashcards.
+    If email is provided, ensure the session belongs to that user."""
     try:
         quiz_session = quiz_sessions_collection.find_one({"session_id": session_id})
         flashcard_session = flashcard_sessions_collection.find_one({"session_id": session_id})
         
         if not quiz_session:
             raise HTTPException(status_code=404, detail="Session not found")
+
+        # If email filter provided, enforce ownership
+        if email and quiz_session.get("user_email") != email:
+            raise HTTPException(status_code=403, detail="Forbidden: access denied")
         
         # Remove MongoDB's _id field
         quiz_session.pop("_id", None)

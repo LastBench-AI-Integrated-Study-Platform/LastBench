@@ -6,20 +6,20 @@ import 'deadline_tracker_page.dart';
 import 'chat_home_page.dart';
 
 class LastBenchHome extends StatefulWidget {
-  const LastBenchHome({super.key});
+  final String? userName;
+  const LastBenchHome({super.key, this.userName});
 
   @override
   State<LastBenchHome> createState() => _LastBenchHomeState();
 }
 
 class _LastBenchHomeState extends State<LastBenchHome> {
- 
   // Colors
   static const Color navy = Color(0xFF033F63);
   static const Color teal = Color(0xFF379392);
 
   // Facts
-  
+
   // Quick actions
   final List<Map<String, dynamic>> quickActions = [
     {
@@ -54,12 +54,11 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       "color": teal,
     },
     {
-  "icon": Icons.schedule,
-  "title": "Deadline Tracker",
-  "subtitle": "Track tasks & exams",
-  "color": teal,
-},
-
+      "icon": Icons.schedule,
+      "title": "Deadline Tracker",
+      "subtitle": "Track tasks & exams",
+      "color": teal,
+    },
   ];
 
   // Study rooms
@@ -107,9 +106,9 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Hey Dude! 👋",
-                    style: TextStyle(
+                  Text(
+                    "Hey ${widget.userName ?? 'Dude'}! 👋",
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
@@ -251,11 +250,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
             ),
 
             // Daily Insights (Dynamic)
-const Padding(
-  padding: EdgeInsets.symmetric(horizontal: 16),
-  child: DailyInsightsCard(),
-),
-
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: DailyInsightsCard(),
+            ),
 
             // Study Rooms Header
             Padding(

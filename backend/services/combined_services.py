@@ -43,7 +43,7 @@ def call_groq_api(prompt: str, max_tokens: int = 8000, temperature: float = 0.7)
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert educational researcher and content creator. You provide detailed, accurate information and create brilliant quiz questions and flashcards."
+                    "content": "You are an expert educational researcher and content creator specializing in exam and placement preparation. You create challenging, diverse questions and flashcards that test deep understanding, application, analysis, and problem-solving skills. Avoid repetition, ensure variety in question types, and focus on high-value concepts for competitive exams and job placements."
                 },
                 {
                     "role": "user",
@@ -64,6 +64,91 @@ def call_groq_api(prompt: str, max_tokens: int = 8000, temperature: float = 0.7)
     except Exception as e:
         print(f"❌ Groq API error: {e}")
         return None
+
+
+# ============================================================================
+# DIFFICULTY-SPECIFIC PROMPT GENERATION
+# ============================================================================
+
+def get_difficulty_prompts(difficulty: str = "medium") -> Dict[str, str]:
+    """
+    Generate difficulty-specific instructions and styles.
+    Returns a dictionary with research and quiz prompts for the given difficulty level.
+    """
+    difficulty = difficulty.lower().strip()
+    
+    if difficulty == "easy":
+        return {
+            "research_instructions": """Focus on foundational concepts and basic understanding:
+1. Clear, simple definitions with everyday examples
+2. Basic principles and fundamental concepts
+3. Common use cases and simple applications
+4. Avoid complex edge cases and advanced optimizations
+5. Include analogies and simple explanations
+6. Focus on memorization of core facts""",
+            
+            "quiz_style": """Generate EXACTLY {num_questions} simple, foundational MCQs suitable for beginners.
+Each MCQ must:
+- Test basic understanding and recall of core concepts
+- Use simple, everyday language
+- Include straightforward distractors (common mistakes)
+- Have clear, unambiguous correct answers
+- Focus on definitions, basic processes, and simple applications
+- Avoid complex scenarios, edge cases, or advanced topics
+Ensure questions are easy for someone learning the topic for the first time.""",
+            
+            "temperature": 0.5
+        }
+    
+    elif difficulty == "hard":
+        return {
+            "research_instructions": """Focus on advanced, nuanced, and complex aspects:
+1. Advanced definitions and edge cases
+2. Complex algorithms, frameworks with intricate interactions
+3. Performance optimizations and critical pitfalls
+4. Real-world complex scenarios and limitations
+5. Comparisons with related advanced concepts
+6. Interview questions testing deep mastery
+7. Recent developments and cutting-edge practices""",
+            
+            "quiz_style": """Generate EXACTLY {num_questions} challenging, advanced MCQs for competitive exams and job placements.
+Each MCQ must:
+- Test advanced understanding: application, analysis, synthesis, problem-solving
+- Use complex, real-world scenarios or edge cases
+- Include tricky distractors based on common misconceptions
+- Challenge assumptions and require critical thinking
+- Combine multiple concepts or test nuanced differences
+- Focus on optimization, trade-offs, and best practices
+- Avoid obvious or straightforward answers
+Ensure questions test mastery and deep expert-level knowledge.""",
+            
+            "temperature": 0.8
+        }
+    
+    else:  # medium (default)
+        return {
+            "research_instructions": """Focus on balanced, practical knowledge:
+1. Comprehensive definitions with contexts
+2. Key principles, methodologies with examples
+3. Important practical applications and use cases
+4. Some advanced concepts and common challenges
+5. Comparisons with related concepts
+6. Real-world considerations and best practices
+7. Interview-relevant topics""",
+            
+            "quiz_style": """Generate EXACTLY {num_questions} moderate-level MCQs suitable for intermediate learners.
+Each MCQ must:
+- Test understanding and application of core concepts
+- Include realistic scenarios or practical situations
+- Have distractors based on partial understanding
+- Require reasoning beyond simple memorization
+- Cover both foundational and intermediate aspects
+- Balance clarity with some complexity
+- Test both knowledge and application skills
+Ensure questions are appropriate for someone with basic knowledge seeking deeper understanding.""",
+            
+            "temperature": 0.7
+        }
 
 
 # ============================================================================
@@ -132,35 +217,32 @@ def extract_all_topics(text: str) -> List[str]:
 # INDIVIDUAL TOPIC RESEARCH & QUIZ GENERATION
 # ============================================================================
 
-def research_and_generate_questions_for_topic(topic: str, num_questions: int = 2) -> List[Dict]:
+def research_and_generate_questions_for_topic(topic: str, num_questions: int = 2, difficulty: str = "medium") -> List[Dict]:
     """
     Research a single topic and generate questions from that research.
     This ensures questions are meaningful and based on actual knowledge.
+    Difficulty can be: easy, medium, or hard
     """
     print(f"\n{'='*60}")
-    print(f"🔬 PROCESSING TOPIC: {topic}")
+    print(f"🔬 PROCESSING TOPIC: {topic} (Difficulty: {difficulty})")
     print(f"{'='*60}\n")
     
-    # Step 1: Research the topic thoroughly
-    print(f"📚 Step 1: Researching '{topic}'...")
+    # Get difficulty-specific prompts
+    difficulty_info = get_difficulty_prompts(difficulty)
+    research_instructions = difficulty_info["research_instructions"]
+    quiz_style = difficulty_info["quiz_style"]
+    temperature = difficulty_info["temperature"]
     
-    research_prompt = f"""You are an educational expert. Provide comprehensive, detailed information about the following topic:
+    # Step 1: Research the topic thoroughly
+    print(f"📚 Step 1: Researching '{topic}' at {difficulty} level...")
+    
+    research_prompt = f"""You are an expert in exam and placement preparation. Provide research on the topic: {topic}.
 
-Topic: {topic}
+{research_instructions}
 
-Provide a thorough explanation covering:
-1. Clear definition and core concepts
-2. Key components, elements, or aspects
-3. Important theories, frameworks, or methodologies
-4. Practical applications and real-world examples
-5. Benefits, challenges, and critical considerations
-6. Important terminology and concepts
+Provide 600-800 words of structured information suitable for generating {difficulty} level MCQs."""
 
-Be detailed and educational. Provide at least 400-500 words of information that can be used to create excellent quiz questions.
-
-Your detailed explanation:"""
-
-    research_content = call_groq_api(research_prompt, max_tokens=2000, temperature=0.7)
+    research_content = call_groq_api(research_prompt, max_tokens=3000, temperature=0.6)
     
     if not research_content:
         print(f"⚠️ Research failed for '{topic}', using fallback")
@@ -170,43 +252,32 @@ Your detailed explanation:"""
     print(f"Preview: {research_content[:200]}...\n")
     
     # Step 2: Generate questions from the research
-    print(f"🧠 Step 2: Generating {num_questions} questions from research...")
+    print(f"🧠 Step 2: Generating {num_questions} {difficulty} questions from research...")
     
-    quiz_prompt = f"""Based on the following comprehensive information about {topic}, create {num_questions} challenging multiple-choice questions.
+    quiz_prompt = f"""Using the following research on {topic}, {quiz_style.format(num_questions=num_questions)}
 
-COMPREHENSIVE INFORMATION:
+RESEARCH:
 {research_content}
 
-Generate EXACTLY {num_questions} brilliant multiple-choice questions that:
-1. Test deep understanding of {topic}
-2. Are based ONLY on the information provided above
-3. Have 4 options each with realistic distractors
-4. Include detailed explanations
-5. Are clear, specific, and educational
+Each MCQ must:
+- Have 4 options: 1 correct, 3 distractors
+- Include a detailed explanation referencing the research
+- Vary question types: no repetition in style or focus
 
-CRITICAL: Return ONLY valid JSON with this EXACT structure:
+Return ONLY valid JSON:
 {{
   "questions": [
     {{
-      "question": "Specific question about {topic}",
-      "options": ["Correct answer", "Plausible distractor 1", "Plausible distractor 2", "Plausible distractor 3"],
+      "question": "Question text for {topic}",
+      "options": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"],
       "correct_answer": 0,
-      "explanation": "Detailed explanation based on the research",
+      "explanation": "Detailed explanation with references to research",
       "topic": "{topic}"
     }}
   ]
-}}
+}}"""
 
-Rules:
-- Questions must be directly answerable from the research above
-- Each question has EXACTLY 4 options
-- correct_answer is the index (0-3) of the correct option
-- Make distractors believable but clearly wrong
-- Explanations should reference the research content
-
-Generate {num_questions} questions now:"""
-
-    quiz_response = call_groq_api(quiz_prompt, max_tokens=3000, temperature=0.8)
+    quiz_response = call_groq_api(quiz_prompt, max_tokens=4000, temperature=temperature)
     
     questions = []
     
@@ -246,15 +317,15 @@ Generate {num_questions} questions now:"""
     if not questions:
         print(f"⚠️ Using fallback question generation for '{topic}'")
         questions = [{
-            "question": f"What is the primary focus of {topic}?",
+            "question": f"What is a key challenge in applying {topic} in real-world scenarios?",
             "options": [
-                f"The strategic and comprehensive approach to {topic}",
-                f"{topic} is not relevant in modern practice",
-                f"{topic} has no practical applications",
-                "This concept is outdated"
+                f"Handling edge cases and optimizations in {topic}",
+                f"{topic} has no challenges",
+                f"{topic} is always straightforward",
+                "Ignore {topic} in practice"
             ],
             "correct_answer": 0,
-            "explanation": f"Based on research, {topic} focuses on comprehensive and strategic approaches.",
+            "explanation": f"Research shows {topic} involves complex edge cases.",
             "topic": topic
         }]
     
@@ -272,17 +343,19 @@ def research_and_generate_flashcards_for_topic(topic: str, num_cards: int = 2) -
     # Step 1: Research the topic
     print(f"🔬 Step 1: Researching '{topic}'...")
     
-    research_prompt = f"""Provide comprehensive information about: {topic}
+    research_prompt = f"""Provide exam-focused research on {topic} for placement and competitive prep.
 
-Cover:
-1. Definition and key concepts
-2. Important components and elements
-3. Practical applications
-4. Critical points to remember
+Include:
+1. Core definitions with nuances
+2. Key differences from similar concepts
+3. Applications, pros/cons, and optimizations
+4. Common exam traps and interview questions
+5. Mnemonics or memory aids if applicable
+6. Recent trends or advanced topics
 
-Provide detailed, educational content (400+ words):"""
+Deliver 600-800 words of structured, memorable content for flashcards."""
 
-    research_content = call_groq_api(research_prompt, max_tokens=2000, temperature=0.7)
+    research_content = call_groq_api(research_prompt, max_tokens=3000, temperature=0.6)
     
     if not research_content:
         research_content = f"{topic} is an important area of study with various applications and considerations."
@@ -292,33 +365,34 @@ Provide detailed, educational content (400+ words):"""
     # Step 2: Generate flashcards
     print(f"🎴 Step 2: Generating {num_cards} flashcards...")
     
-    flashcard_prompt = f"""Based on this comprehensive information about {topic}, create {num_cards} high-quality study flashcards.
+    flashcard_prompt = f"""From the research on {topic}, create EXACTLY {num_cards} diverse flashcards for exam/placement prep.
 
-INFORMATION:
+RESEARCH:
 {research_content}
 
-Generate EXACTLY {num_cards} flashcards that:
-1. Focus on key concepts from {topic}
-2. Have clear questions on the front
-3. Have comprehensive answers on the back
-4. Are directly based on the information above
+Each flashcard must:
+- Front: A key concept, term, difference, or scenario question
+- Back: Concise yet detailed answer with examples, pros/cons, or steps
+- Focus on memorization, quick recall, and application
+- Vary types: definitions, comparisons, processes, pitfalls
+- Differ from MCQs: no options, emphasize key facts/differences
 
-CRITICAL: Return ONLY valid JSON:
+Return ONLY valid JSON:
 {{
   "flashcards": [
     {{
-      "front": "Clear question about a key concept",
-      "back": "Comprehensive answer based on research",
-      "question": "Clear question about a key concept",
-      "answer": "Comprehensive answer based on research",
+      "front": "Key term or question (e.g., 'What are the key differences between {topic} and related concept?')",
+      "back": "Detailed, memorable answer with examples and tips",
+      "question": "Key term or question",
+      "answer": "Detailed, memorable answer with examples and tips",
       "topic": "{topic}"
     }}
   ]
 }}
 
-Generate {num_cards} flashcards now:"""
+Ensure no overlap with MCQ styles; prioritize unique, high-yield content."""
 
-    flashcard_response = call_groq_api(flashcard_prompt, max_tokens=3000, temperature=0.8)
+    flashcard_response = call_groq_api(flashcard_prompt, max_tokens=4000, temperature=0.8)
     
     flashcards = []
     
@@ -348,10 +422,10 @@ Generate {num_cards} flashcards now:"""
     if not flashcards:
         print(f"⚠️ Using fallback flashcard for '{topic}'")
         flashcards = [{
-            "front": f"What is {topic}?",
-            "back": f"{topic} is a crucial concept that involves strategic approaches and comprehensive understanding.",
-            "question": f"Define {topic}",
-            "answer": f"{topic} is a crucial concept that involves strategic approaches and comprehensive understanding.",
+            "front": f"Key differences in {topic}?",
+            "back": f"{topic} differs from similar concepts in applications and optimizations.",
+            "question": f"Key differences in {topic}?",
+            "answer": f"{topic} differs from similar concepts in applications and optimizations.",
             "topic": topic
         }]
     
@@ -362,15 +436,17 @@ Generate {num_cards} flashcards now:"""
 # MAIN GENERATION FUNCTIONS
 # ============================================================================
 
-def generate_mcq_quiz(text: str, num_questions: int = 10) -> Dict:
+def generate_mcq_quiz(text: str, num_questions: int = 10, difficulty: str = "medium") -> Dict:
     """
     Generate quiz by:
     1. Extracting all topics from document
-    2. For each topic: research it and generate questions
+    2. For each topic: research it and generate questions based on difficulty
     3. Combine all questions
+    
+    Difficulty levels: easy, medium, hard
     """
     print(f"\n{'='*70}")
-    print(f"🎓 STARTING QUIZ GENERATION ({num_questions} questions)")
+    print(f"🎓 STARTING QUIZ GENERATION ({num_questions} questions at {difficulty} level)")
     print(f"{'='*70}\n")
     
     # Extract all topics
@@ -387,7 +463,7 @@ def generate_mcq_quiz(text: str, num_questions: int = 10) -> Dict:
         }]}
     
     print(f"\n📊 Will generate questions from {len(topics)} topics")
-    print(f"Target: {num_questions} total questions\n")
+    print(f"Target: {num_questions} total questions at {difficulty} level\n")
     
     # Calculate questions per topic
     questions_per_topic = max(1, num_questions // len(topics))
@@ -404,9 +480,9 @@ def generate_mcq_quiz(text: str, num_questions: int = 10) -> Dict:
             break
         
         print(f"\n[{i+1}/{len(topics)}] Processing topic: {topic}")
-        print(f"Generating {topic_question_count} question(s)...")
+        print(f"Generating {topic_question_count} {difficulty} question(s)...")
         
-        topic_questions = research_and_generate_questions_for_topic(topic, topic_question_count)
+        topic_questions = research_and_generate_questions_for_topic(topic, topic_question_count, difficulty=difficulty)
         all_questions.extend(topic_questions)
         
         # Small delay to avoid rate limiting

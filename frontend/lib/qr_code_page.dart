@@ -1,34 +1,11 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
-class QRCodePage extends StatefulWidget {
-  final VoidCallback onNext;
+class QRCodePage extends StatelessWidget {
+  /// Placeholder page for QR flow that was converted to OTP
+  final void Function(String sessionId) onNext;
   final VoidCallback onBack;
 
-  const QRCodePage({
-    super.key,
-    required this.onNext,
-    required this.onBack,
-  });
-
-  @override
-  State<QRCodePage> createState() => _QRCodePageState();
-}
-
-class _QRCodePageState extends State<QRCodePage> {
-  late String sessionId;
-
-  @override
-  void initState() {
-    super.initState();
-    generateQR();
-  }
-
-  void generateQR() {
-    sessionId =
-        "pwd_reset_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}";
-  }
+  const QRCodePage({super.key, required this.onNext, required this.onBack});
 
   @override
   Widget build(BuildContext context) {
@@ -42,36 +19,17 @@ class _QRCodePageState extends State<QRCodePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  "Reset Password",
+                  'QR flow removed',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 10),
-                const Text("Scan the QR code to verify your identity"),
-
-                const SizedBox(height: 20),
-
-                QrImageView(
-                  data: sessionId,
-                  size: 250,
+                const SizedBox(height: 6),
+                const Text(
+                  'Password reset now uses OTP sent to your email. Please go back and choose "Forgot password" to continue.',
                 ),
-
-                const SizedBox(height: 20),
-
-                ElevatedButton(
-                  onPressed: widget.onNext,
-                  child: const Text("Next Step"),
-                ),
-
+                const SizedBox(height: 12),
                 TextButton(
-                  onPressed: widget.onBack,
-                  child: const Text("Back to Login"),
-                ),
-
-                TextButton(
-                  onPressed: () {
-                    setState(() => generateQR());
-                  },
-                  child: const Text("Generate New QR Code"),
+                  onPressed: onBack,
+                  child: const Text('Back to Login'),
                 ),
               ],
             ),
