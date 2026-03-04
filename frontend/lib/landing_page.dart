@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'daily_insights_card.dart';
-import 'deadline_tracker_page.dart';
+
+class Brand {
+  static const Color navy = Color(0xFF033F63);
+  static const Color teal = Color(0xFF379392);
+  static const Color muted = Color(0xFF6B7280);
+}
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -10,46 +14,6 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  // Brand colors
-  static const Color navy = Color(0xFF033F63);
-  static const Color teal = Color(0xFF379392);
-
-  final List<Map<String, dynamic>> features = [
-    {
-      "icon": Icons.description,
-      "title": "Ask from Notes & PYQs",
-      "desc":
-          "Upload previous year questions, notes, or PDFs and ask doubts directly.",
-    },
-    {
-      "icon": Icons.chat,
-      "title": "Group Chat by Exam",
-      "desc":
-          "Join exam-specific groups to discuss problems and share resources.",
-    },
-    {
-      "icon": Icons.video_call,
-      "title": "Study Together, Live",
-      "desc": "Join live study rooms and revise together.",
-    },
-    {
-      "icon": Icons.help_outline,
-      "title": "Ask & Answer Doubts",
-      "desc": "Post doubts and get help from peers or mentors.",
-    },
-    {
-      "icon": Icons.emoji_events,
-      "title": "Quiz + Flashcards",
-      "desc":
-          "Attach your notes to auto-generate quizzes and flashcards for revision.",
-    },
-    {
-      "icon": Icons.lightbulb,
-      "title": "Daily Exam Insights",
-      "desc": "Get daily exam facts, shortcuts, and motivation.",
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,191 +22,282 @@ class _LandingPageState extends State<LandingPage> {
       // ---------------- APP BAR ----------------
       appBar: AppBar(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 1,
-        title: const Text(
-          "Last Bench",
-          style: TextStyle(color: navy, fontWeight: FontWeight.bold),
+        toolbarHeight: 80,
+
+        title: Image.asset(
+          'lib/assets/Logo.png',
+          height: 120,
         ),
+
         actions: [
           TextButton(
-            onPressed: () {},
-            child: const Text("Login", style: TextStyle(color: navy)),
+            onPressed: () => Navigator.pushNamed(context, '/login'),
+            child: const Text(
+              "Login",
+              style: TextStyle(fontSize: 12, color: Colors.black),
+            ),
           ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: teal),
-            onPressed: () {},
-            child: const Text("Sign Up"),
+
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, '/signup'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Brand.teal,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text("Sign Up",
+                  style: TextStyle(fontSize: 12, color: Colors.white)),
+            ),
           ),
-          const SizedBox(width: 12),
         ],
       ),
 
       // ---------------- BODY ----------------
       body: SingleChildScrollView(
         child: Column(
-          children: [
-            // ---------------- HERO ----------------
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  const Text(
-                    "From the Last Bench\nto the Top Rank.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: navy,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "A collaborative study platform where students prepare together for exams and placements.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.black54, fontSize: 16),
-                  ),
-                  const SizedBox(height: 24),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // ✅ NAVIGATION ADDED HERE
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: teal,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 28,
-                            vertical: 14,
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DeadlineTrackerPage(),
-                            ),
-                          );
-                        },
-                        child: const Text("Get Started Free"),
-                      ),
-                      const SizedBox(width: 16),
-                      OutlinedButton(
-                        onPressed: () {},
-                        child: const Text("Login"),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // ---------------- FACT CARD ----------------
-            const DailyInsightsCard(),
-
-            // ---------------- FEATURES ----------------
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  const Text(
-                    "Everything You Need to Study Smarter",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: navy,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Collaborative tools built for exam success",
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                  const SizedBox(height: 24),
-
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: features.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.35,
-                        ),
-                    itemBuilder: (context, index) {
-                      final f = features[index];
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(f["icon"], size: 32, color: teal),
-                              const SizedBox(height: 12),
-                              Text(
-                                f["title"],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: navy,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                f["desc"],
-                                style: const TextStyle(
-                                  color: Colors.black54,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // ---------------- FOOTER ----------------
-            Container(
-              width: double.infinity,
-              color: navy,
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: const [
-                  Text(
-                    "Last Bench",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    "From the Last Bench to the Top Rank.",
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    "© 2025 Last Bench. All rights reserved.",
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
+          children: const [
+            HeroSection(),
+            FeaturesSection(),
+            FooterSection(),
           ],
         ),
       ),
     );
   }
+}
+
+/* ---------------- HERO ---------------- */
+
+class HeroSection extends StatelessWidget {
+  const HeroSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Image.asset(
+            'lib/assets/GroupStudyImage.png',
+            height: width > 900 ? 420 : 300,
+          ),
+
+          const SizedBox(height: 24),
+
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: width > 900 ? 40 : 28,
+                fontWeight: FontWeight.w800,
+                color: Brand.navy,
+              ),
+              children: const [
+                TextSpan(text: "From the "),
+                TextSpan(
+                    text: "Last Bench\n",
+                    style: TextStyle(color: Brand.teal)),
+                TextSpan(text: "to the "),
+                TextSpan(
+                    text: "Top Rank.",
+                    style: TextStyle(color: Brand.teal)),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: 720,
+            child: Text(
+              "Last Bench is a collaborative study platform where students prepare together using notes, PYQs, live rooms and placements.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Brand.muted),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          Wrap(
+            spacing: 12,
+            children: const [
+              _PrimaryButton(label: "Get Started"),
+              _OutlineButton(label: "Login"),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/* ---------------- FEATURES ---------------- */
+
+class FeaturesSection extends StatelessWidget {
+  const FeaturesSection({super.key});
+
+  static final features = [
+    _Feature(Icons.description, "Ask from Notes",
+        "Upload PDFs and ask doubts directly."),
+    _Feature(Icons.chat, "Group Chat",
+        "Discuss exam topics with peers."),
+    _Feature(Icons.video_call, "Study Live",
+        "Join live study rooms."),
+    _Feature(Icons.help_outline, "Ask Doubts",
+        "Get help from mentors."),
+    _Feature(Icons.emoji_events, "Placement Prep",
+        "Practice aptitude & interviews."),
+    _Feature(Icons.lightbulb, "Daily Insights",
+        "Motivation and shortcuts."),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          const Text(
+            "Everything You Need to Study Smarter",
+            style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Brand.navy),
+          ),
+
+          const SizedBox(height: 32),
+
+          Wrap(
+            spacing: 24,
+            runSpacing: 24,
+            children: features
+                .map((f) => SizedBox(
+                      width: width > 900 ? 300 : width,
+                      child: FeatureCard(feature: f),
+                    ))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/* ---------------- FEATURE CARD ---------------- */
+
+class FeatureCard extends StatelessWidget {
+  final _Feature feature;
+  const FeatureCard({required this.feature});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(blurRadius: 10, color: Color(0x11000000))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(feature.icon, color: Brand.teal),
+
+          const SizedBox(height: 12),
+
+          Text(feature.title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Brand.navy)),
+
+          const SizedBox(height: 6),
+
+          Text(feature.desc, style: const TextStyle(color: Brand.muted)),
+        ],
+      ),
+    );
+  }
+}
+
+/* ---------------- FOOTER ---------------- */
+
+class FooterSection extends StatelessWidget {
+  const FooterSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(40),
+      color: Brand.navy,
+      child: const Column(
+        children: [
+          Text("Last Bench",
+              style: TextStyle(color: Colors.white, fontSize: 22)),
+
+          SizedBox(height: 12),
+
+          Text("Back benchers welcome.",
+              style: TextStyle(color: Brand.teal)),
+
+          SizedBox(height: 20),
+
+          Text("© 2025 Last Bench",
+              style: TextStyle(color: Colors.white60)),
+        ],
+      ),
+    );
+  }
+}
+
+/* ---------------- BUTTONS ---------------- */
+
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  const _PrimaryButton({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: () {},
+      style:
+          ElevatedButton.styleFrom(backgroundColor: Brand.teal),
+      child: Text(label,
+          style: const TextStyle(color: Colors.white)),
+    );
+  }
+}
+
+class _OutlineButton extends StatelessWidget {
+  final String label;
+  const _OutlineButton({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: () {},
+      child: Text(label,
+          style: const TextStyle(color: Colors.black)),
+    );
+  }
+}
+
+/* ---------------- MODEL ---------------- */
+
+class _Feature {
+  final IconData icon;
+  final String title;
+  final String desc;
+
+  const _Feature(this.icon, this.title, this.desc);
 }

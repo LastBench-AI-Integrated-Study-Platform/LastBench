@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'quizandflash.dart';
+import 'difficulty_selection_page.dart';
 import 'config.dart';
 
 class UploadFileScreen extends StatefulWidget {
@@ -249,15 +250,15 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
           return;
         }
 
-        // User confirmed - proceed to quiz/flashcards screen
+        // User confirmed - proceed to difficulty selection screen
         if (mounted) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => QuizAndFlashScreen(
-                sessionId: data['session_id'],
-                quiz: data['quiz'],
-                flashcards: data['flashcards'],
+              builder: (context) => DifficultySelectionScreen(
+                fileBytes: fileBytes,
+                fileName: fileName,
+                userEmail: currentUserEmail,
               ),
             ),
           );

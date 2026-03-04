@@ -3,6 +3,8 @@ import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
+import 'chat_home_page.dart';
+import 'doubt_section.dart'; // ← imported
 
 class LastBenchHome extends StatefulWidget {
   final String? userName;
@@ -17,8 +19,6 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   static const Color navy = Color(0xFF033F63);
   static const Color teal = Color(0xFF379392);
 
-  // Facts
-
   // Quick actions
   final List<Map<String, dynamic>> quickActions = [
     {
@@ -30,6 +30,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
     {
       "icon": Icons.chat,
       "title": "Chat with Group",
+      "subtitle": "Discuss topics and share ideas",
       "badge": "4",
       "color": navy,
     },
@@ -96,7 +97,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Greeting
+            // ── Greeting ─────────────────────────────────────────────────
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
@@ -144,7 +145,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               ),
             ),
 
-            // Quick Actions
+            // ── Quick Actions ─────────────────────────────────────────────
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Text(
@@ -189,9 +190,15 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                               builder: (context) => const DeadlineTrackerPage(),
                             ),
                           );
+                        } else if (action["title"] == "Chat with Group") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChatHomePage(),
+                            ),
+                          );
                         }
                       },
-
                       child: Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -237,13 +244,13 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               ),
             ),
 
-            // Daily Insights (Dynamic)
+            // ── Daily Insights ────────────────────────────────────────────
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: DailyInsightsCard(),
             ),
 
-            // Study Rooms Header
+            // ── Study Rooms Header ────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -271,7 +278,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
 
             const SizedBox(height: 12),
 
-            // Study Rooms List
+            // ── Study Rooms List ──────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -362,7 +369,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                                 ),
                               ),
                               onPressed: () {},
-                              child: const Text("Join"),
+                              child: const Text(
+                                "Join",
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ],
                         ),
@@ -373,7 +383,13 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               ),
             ),
 
-            const SizedBox(height: 60),
+            // ── Doubts Section ────────────────────────────────────────────
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: DoubtsSection(),
+            ),
+
+            const SizedBox(height: 80),
           ],
         ),
       ),
