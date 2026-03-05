@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'last_bench_home.dart';
-
+import 'deadline_tracker_page.dart';
+import 'deadline_provider.dart';
 
 void main() {
   runApp(const LastBenchApp());
@@ -13,21 +15,22 @@ class LastBenchApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Last Bench',
-      theme: ThemeData(
-        primaryColor: const Color(0xFF033F63),
+    return ChangeNotifierProvider(
+      create: (_) => DeadlineProvider(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Last Bench',
+        theme: ThemeData(
+          primaryColor: const Color(0xFF033F63),
+        ),
+        initialRoute: '/login', // ✅ always start at login
+        routes: {
+          '/login':    (context) => const LoginPage(),
+          '/signup':   (context) => const SignupPage(),
+          '/home':     (context) => const LastBenchHome(),
+          '/deadline': (context) => const DeadlineTrackerPage(),
+        },
       ),
-
-      // 👇 First screen
-      initialRoute: '/home',
-
-      routes: {
-        '/login': (context) => const LoginPage(),
-        '/signup': (context) => const SignupPage(),
-        '/home': (context) => const LastBenchHome(),
-      },
     );
   }
 }

@@ -20,7 +20,8 @@ from sentence_transformers import SentenceTransformer
 
 from routes.auth_routes import router as auth_router
 from routes.insights_routes import router as insights_router
-from routes import combined_routes   # ✅ if you want /api routes
+from routes import combined_routes 
+from routes.deadline_routes import router as deadline_router
 
 # ================= CONFIG =================
 load_dotenv()
@@ -41,6 +42,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(insights_router)
 app.include_router(combined_routes.router, prefix="/api")
+app.include_router(deadline_router)
+
 
 # ================= GROQ + EMBEDDINGS =================
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))

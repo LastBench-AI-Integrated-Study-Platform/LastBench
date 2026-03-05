@@ -9,11 +9,11 @@ class QuizAndFlashScreen extends StatefulWidget {
   final Map<String, dynamic> flashcards;
 
   const QuizAndFlashScreen({
-    Key? key,
+    super.key,
     required this.sessionId,
     required this.quiz,
     required this.flashcards,
-  }) : super(key: key);
+  });
 
   @override
   State<QuizAndFlashScreen> createState() => _QuizAndFlashScreenState();
@@ -115,7 +115,7 @@ class _QuizAndFlashScreenState extends State<QuizAndFlashScreen>
                       ),
                       dividerColor: Colors.transparent,
                       splashFactory: NoSplash.splashFactory,
-                      overlayColor: MaterialStateProperty.all(
+                      overlayColor: WidgetStateProperty.all(
                         Colors.transparent,
                       ),
                       labelColor: Colors.black,
@@ -167,8 +167,7 @@ class QuizSection extends StatefulWidget {
   final String sessionId;
   final Map<String, dynamic> quizData;
 
-  const QuizSection({Key? key, required this.sessionId, required this.quizData})
-    : super(key: key);
+  const QuizSection({super.key, required this.sessionId, required this.quizData});
 
   @override
   State<QuizSection> createState() => _QuizSectionState();
@@ -521,7 +520,7 @@ class _QuizSectionState extends State<QuizSection> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
 
               const SizedBox(height: 16),
               SizedBox(
@@ -749,10 +748,10 @@ class FlashcardsSection extends StatefulWidget {
   final Map<String, dynamic> flashcardsData;
 
   const FlashcardsSection({
-    Key? key,
+    super.key,
     required this.sessionId,
     required this.flashcardsData,
-  }) : super(key: key);
+  });
 
   @override
   State<FlashcardsSection> createState() => _FlashcardsSectionState();

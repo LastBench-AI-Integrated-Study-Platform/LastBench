@@ -1,9 +1,23 @@
 import 'dart:convert';
+import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 
 class AuthService {
-static const String baseUrl = "http://127.0.0.1:8000";
+  static const String baseUrl = "http://127.0.0.1:8000";
 
+  // ── Save/Get email from localStorage ─────────────────────────────────────
+  static void saveUserEmail(String email) {
+    html.window.localStorage['lb_user_email'] = email;
+    // verify it saved
+    final check = html.window.localStorage['lb_user_email'];
+    print('=== Email saved to localStorage: $check');
+  }
+
+  static String? getUserEmail() {
+    return html.window.localStorage['lb_user_email'];
+  }
+
+  // ── Signup ────────────────────────────────────────────────────────────────
   static Future<String> signup({
     required String name,
     required String email,
@@ -20,14 +34,13 @@ static const String baseUrl = "http://127.0.0.1:8000";
         "exam": exam,
       }),
     );
-
     final data = jsonDecode(res.body);
-    if (res.statusCode != 200) {
-      throw data["detail"];
-    }
+    if (res.statusCode != 200) throw data["detail"];
+    saveUserEmail(email); // ✅ save email
     return data["message"];
   }
 
+  // ── Login ─────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -40,11 +53,9 @@ static const String baseUrl = "http://127.0.0.1:8000";
         "password": password,
       }),
     );
-
     final data = jsonDecode(res.body);
-    if (res.statusCode != 200) {
-      throw data["detail"];
-    }
+    if (res.statusCode != 200) throw data["detail"];
+    saveUserEmail(email); // ✅ save email
     return data;
   }
 }

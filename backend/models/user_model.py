@@ -1,11 +1,17 @@
-from pydantic import BaseModel, EmailStr
+from db.connection import db
+from pydantic import BaseModel
+from typing import Optional
 
+# ── MongoDB collection ────────────────────────────────────────────────────────
+user_collection = db["users"]
+
+# ── Pydantic schemas (kept here so auth_routes imports don't break) ───────────
 class UserSignup(BaseModel):
-    name: str
-    email: EmailStr
+    name:     str
+    email:    str
     password: str
-    exam: str
+    exam:     Optional[str] = None
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email:    str
     password: str
