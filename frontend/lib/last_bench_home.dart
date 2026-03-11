@@ -5,10 +5,12 @@ import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
 import 'chat_home_page.dart';
 import 'doubt_section.dart';
+import 'services/streak_service.dart';
 
 class LastBenchHome extends StatefulWidget {
   final String? userName;
-  const LastBenchHome({super.key, this.userName});
+  final String? userEmail;
+  const LastBenchHome({super.key, this.userName, this.userEmail});
 
   @override
   State<LastBenchHome> createState() => _LastBenchHomeState();
@@ -22,6 +24,49 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   // ── Scroll controller + key for Doubts Section ──
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _doubtsSectionKey = GlobalKey();
+
+  // Streak state
+  int _currentStreak = 0;
+  bool _isStreakLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStreak();
+  }
+
+  Future<void> _loadStreak() async {
+    if (widget.userEmail == null) {
+      setState(() => _isStreakLoading = false);
+      return;
+    }
+
+    try {
+      final streakData = await StreakService.getCurrentStreak(
+        widget.userEmail!,
+      );
+      setState(() {
+        _currentStreak = streakData['current_streak'] ?? 0;
+        _isStreakLoading = false;
+      });
+    } catch (e) {
+      print('Error loading streak: $e');
+      setState(() => _isStreakLoading = false);
+    }
+  }
+
+  Future<void> _updateStreak() async {
+    if (widget.userEmail == null) return;
+
+    try {
+      final streakData = await StreakService.updateStreak(widget.userEmail!);
+      setState(() {
+        _currentStreak = streakData['current_streak'] ?? 0;
+      });
+    } catch (e) {
+      print('Error updating streak: $e');
+    }
+  }
 
   void _scrollToDoubts() {
     final ctx = _doubtsSectionKey.currentContext;
@@ -153,13 +198,29 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.local_fire_department, color: Colors.orange),
-                        SizedBox(width: 6),
-                        Text(
-                          "4-day study streak",
-                          style: TextStyle(color: Colors.white),
+                      children: [
+                        const Icon(
+                          Icons.local_fire_department,
+                          color: Colors.orange,
                         ),
+                        const SizedBox(width: 6),
+                        _isStreakLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                _currentStreak == 0
+                                    ? "Start your streak!"
+                                    : "${_currentStreak}-day study streak",
+                                style: const TextStyle(color: Colors.white),
+                              ),
                       ],
                     ),
                   ),
@@ -196,7 +257,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                             MaterialPageRoute(
                               builder: (context) => UploadScreen(),
                             ),
-                          );
+                          ).then((_) => _updateStreak());
                         } else if (action["title"] ==
                             "Quiz cards + Flashcards") {
                           Navigator.push(
@@ -204,7 +265,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                             MaterialPageRoute(
                               builder: (context) => const UploadFileScreen(),
                             ),
-                          );
+                          ).then((_) => _updateStreak());
                         } else if (action["title"] == "Deadline Tracker") {
                           Navigator.push(
                             context,

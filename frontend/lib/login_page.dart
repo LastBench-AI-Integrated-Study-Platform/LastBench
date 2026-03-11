@@ -54,7 +54,10 @@ class _LoginPageState extends State<LoginPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => LastBenchHome(userName: userName)),
+        MaterialPageRoute(
+          builder: (_) =>
+              LastBenchHome(userName: userName, userEmail: userEmail),
+        ),
       );
     } catch (e) {
       setState(() => error = e.toString());

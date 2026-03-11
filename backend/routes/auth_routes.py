@@ -32,11 +32,16 @@ async def signup(user: UserSignup):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Initialize streak data for new user
+    today = datetime.now().strftime("%Y-%m-%d")
     db.users.insert_one({
         "name": user.name,
         "email": user.email,
         "password": hash_password(user.password),
-        "exam": user.exam
+        "exam": user.exam,
+        "current_streak": 0,
+        "last_study_date": None,
+        "study_dates": []
     })
 
     return {"message": "Signup successful"}
@@ -56,7 +61,10 @@ async def login(user: UserLogin):
         "user": {
             "name": db_user["name"],
             "email": db_user["email"],
-            "exam": db_user["exam"]
+            "exam": db_user["exam"],
+            "current_streak": db_user.get("current_streak", 0),
+            "last_study_date": db_user.get("last_study_date"),
+            "study_dates": db_user.get("study_dates", [])
         }
     }
 
