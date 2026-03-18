@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
 import 'chat_home_page.dart';
 import 'doubt_section.dart';
+import 'login_page.dart';
+import 'profile_creation_page.dart';
 import 'services/streak_service.dart';
 
 class LastBenchHome extends StatefulWidget {
@@ -29,10 +35,14 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   int _currentStreak = 0;
   bool _isStreakLoading = true;
 
+  // Profile state
+  String? _profileImageBase64;
+
   @override
   void initState() {
     super.initState();
     _loadStreak();
+    _loadProfileImage();
   }
 
   Future<void> _loadStreak() async {
@@ -53,6 +63,13 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       print('Error loading streak: $e');
       setState(() => _isStreakLoading = false);
     }
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _profileImageBase64 = prefs.getString('profile_image_base64');
+    });
   }
 
   Future<void> _updateStreak() async {
@@ -76,6 +93,27 @@ class _LastBenchHomeState extends State<LastBenchHome> {
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeInOut,
       );
+    }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+  }
+
+  Widget _buildProfileIcon() {
+    if (_profileImageBase64 != null) {
+      final bytes = base64Decode(_profileImageBase64!);
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: MemoryImage(Uint8List.fromList(bytes)),
+      );
+    } else {
+      return const Icon(Icons.account_circle, color: Colors.white, size: 32);
     }
   }
 
@@ -167,61 +205,112 @@ class _LastBenchHomeState extends State<LastBenchHome> {
             // ── Greeting ─────────────────────────────────────────────────
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
               color: navy,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  Text(
-                    "Hey ${widget.userName ?? 'Dude'}! 👋",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    "Back bencher today, topper tomorrow 😌",
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.local_fire_department,
-                          color: Colors.orange,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Hey ${widget.userName ?? 'Dude'}! 👋",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(width: 6),
-                        _isStreakLoading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Back bencher today, topper tomorrow 😌",
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.local_fire_department,
+                              color: Colors.orange,
+                            ),
+                            const SizedBox(width: 6),
+                            _isStreakLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    _currentStreak == 0
+                                        ? "Start your streak!"
+                                        : "${_currentStreak}-day study streak",
+                                    style: const TextStyle(color: Colors.white),
                                   ),
-                                ),
-                              )
-                            : Text(
-                                _currentStreak == 0
-                                    ? "Start your streak!"
-                                    : "${_currentStreak}-day study streak",
-                                style: const TextStyle(color: Colors.white),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: PopupMenuButton<String>(
+                      onSelected: (String value) {
+                        if (value == 'create_profile') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProfileCreationPage(
+                                userEmail: widget.userEmail,
                               ),
-                      ],
+                            ),
+                          ).then((_) => _loadProfileImage());
+                        } else if (value == 'view_edit_profile') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProfileCreationPage(
+                                userEmail: widget.userEmail,
+                                isEditing: true,
+                              ),
+                            ),
+                          ).then((_) => _loadProfileImage());
+                        } else if (value == 'logout') {
+                          // Clear user data and navigate to login
+                          _logout();
+                        }
+                      },
+                      itemBuilder: (BuildContext context) =>
+                          <PopupMenuEntry<String>>[
+                            const PopupMenuItem<String>(
+                              value: 'create_profile',
+                              child: Text('Create Profile'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'view_edit_profile',
+                              child: Text('View and Edit Profile'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'logout',
+                              child: Text('Logout'),
+                            ),
+                          ],
+                      icon: _buildProfileIcon(),
                     ),
                   ),
                 ],
