@@ -15,7 +15,7 @@ from services.doubt_services import (
     create_doubt, get_all_doubts, get_doubt_by_id,
     update_doubt, delete_doubt,
     add_comment, update_comment, delete_comment,
-    add_reply, delete_reply,
+    add_reply, update_reply, delete_reply,
     get_doubt_statistics
 )
 
@@ -189,6 +189,22 @@ async def add_reply_endpoint(
 ):
     """Add a reply to a comment"""
     result = add_reply(doubt_id, comment_id, reply)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    
+    return result
+
+
+@router.put("/{doubt_id}/comments/{comment_id}/replies/{reply_id}")
+async def update_reply_endpoint(
+    doubt_id: str,
+    comment_id: str,
+    reply_id: str,
+    reply_update: ReplyCreate
+):
+    """Update a reply"""
+    result = update_reply(doubt_id, comment_id, reply_id, reply_update)
     
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["message"])
