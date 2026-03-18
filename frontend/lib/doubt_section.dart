@@ -395,6 +395,65 @@ class _DoubtsSectionState extends State<DoubtsSection> {
     );
   }
 
+  Future<void> _editDoubt(DoubtApiModel doubt) async {
+    final result = await showDialog<DoubtApiModel>(
+      context: context,
+      builder: (_) => _EditDoubtDialog(doubt: doubt),
+    );
+    if (result != null && mounted) {
+      _loadDoubts();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Doubt updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteDoubt(DoubtApiModel doubt) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Doubt'),
+        content: const Text(
+          'Are you sure you want to delete this doubt? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteDoubt(doubt.id ?? '');
+      if (success && mounted) {
+        _loadDoubts();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Doubt deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete doubt'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredDoubts;
@@ -472,6 +531,8 @@ class _DoubtsSectionState extends State<DoubtsSection> {
                   onTap: () => _openDoubtDetail(doubt),
                   currentUserName: _currentUserName,
                   currentUserAvatar: _currentUserAvatar,
+                  onEdit: () => _editDoubt(doubt),
+                  onDelete: () => _deleteDoubt(doubt),
                 ),
               );
             }),
@@ -655,11 +716,15 @@ class _DoubtCard extends StatelessWidget {
   final VoidCallback onTap;
   final String currentUserName;
   final String currentUserAvatar;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   const _DoubtCard({
     required this.doubt,
     required this.onTap,
     required this.currentUserName,
     required this.currentUserAvatar,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -721,7 +786,43 @@ class _DoubtCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _Badge(label: doubt.subject ?? ''),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _Badge(label: doubt.subject ?? ''),
+                          if (doubt.author == currentUserName &&
+                              (onEdit != null || onDelete != null)) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (onEdit != null)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      size: 16,
+                                      color: kMutedForeground,
+                                    ),
+                                    onPressed: onEdit,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                if (onDelete != null)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      size: 16,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: onDelete,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -1098,7 +1199,350 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
   }
 }
 
-// ─── Doubt Detail Page ────────────────────────────────────────────────────────
+// ─── Edit Doubt Dialog ─────────────────────────────────────────────────────
+
+class _EditDoubtDialog extends StatefulWidget {
+  final DoubtApiModel doubt;
+  const _EditDoubtDialog({required this.doubt});
+  @override
+  State<_EditDoubtDialog> createState() => _EditDoubtDialogState();
+}
+
+class _EditDoubtDialogState extends State<_EditDoubtDialog> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _subjectCtrl;
+  late final TextEditingController _contentCtrl;
+  List<Uint8List> _imageBytes = [];
+  bool _isPickingImage = false;
+
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.doubt.title);
+    _subjectCtrl = TextEditingController(text: widget.doubt.subject);
+    _contentCtrl = TextEditingController(text: widget.doubt.content);
+    _initializeUser();
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _subjectCtrl.dispose();
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    if (_isPickingImage) return;
+    setState(() => _isPickingImage = true);
+    try {
+      final bytes = await pickImageFromWeb();
+      if (bytes != null && mounted) {
+        setState(() => _imageBytes.add(bytes));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not pick image: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false);
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() => _imageBytes.removeAt(index));
+  }
+
+  Future<void> _submit() async {
+    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill title and description')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      List<String> uploadedImageUrls = List.from(widget.doubt.imageUrls ?? []);
+      if (_imageBytes.isNotEmpty) {
+        for (int i = 0; i < _imageBytes.length; i++) {
+          final url = await DoubtApiService.uploadImage(
+            _imageBytes[i],
+            'doubt_image_$i.jpg',
+          );
+          if (url != null) {
+            uploadedImageUrls.add(url);
+          }
+        }
+      }
+
+      final success = await DoubtApiService.updateDoubt(
+        widget.doubt.id ?? '',
+        title: _titleCtrl.text.trim(),
+        content: _contentCtrl.text.trim(),
+        subject: _subjectCtrl.text.trim().isEmpty
+            ? 'General'
+            : _subjectCtrl.text.trim(),
+        imageUrls: uploadedImageUrls,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        final updated = DoubtApiModel(
+          id: widget.doubt.id,
+          title: _titleCtrl.text.trim(),
+          content: _contentCtrl.text.trim(),
+          subject: _subjectCtrl.text.trim().isEmpty
+              ? 'General'
+              : _subjectCtrl.text.trim(),
+          author: widget.doubt.author,
+          authorAvatar: widget.doubt.authorAvatar,
+          imageUrls: uploadedImageUrls,
+          createdAt: widget.doubt.createdAt,
+          comments: widget.doubt.comments,
+        );
+        Navigator.of(context).pop(updated);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update doubt'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kRadius),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Doubt',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: kForeground,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const _FormLabel('Title'),
+            const SizedBox(height: 8),
+            _StyledInput(
+              controller: _titleCtrl,
+              hint: "What's your question about?",
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Subject'),
+            const SizedBox(height: 8),
+            _StyledInput(
+              controller: _subjectCtrl,
+              hint: 'e.g., Mathematics, Physics, DSA...',
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Description'),
+            const SizedBox(height: 8),
+            _StyledTextArea(
+              controller: _contentCtrl,
+              hint: 'Explain your doubt in detail...',
+              minLines: 4,
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Add Images (optional)'),
+            const SizedBox(height: 8),
+
+            Column(
+              children: [
+                if (_imageBytes.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: kBorder, width: 1.5),
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                      itemCount: _imageBytes.length,
+                      itemBuilder: (ctx, idx) => Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(kRadius),
+                            child: Image.memory(
+                              _imageBytes[idx],
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () => _removeImage(idx),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.55),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.all(3),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_imageBytes.isNotEmpty) const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _pickImage,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    height: 96,
+                    decoration: BoxDecoration(
+                      color: kMuted,
+                      borderRadius: BorderRadius.circular(kRadius),
+                      border: Border.all(color: kBorder, width: 1.5),
+                    ),
+                    child: Center(
+                      child: _isPickingImage
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: kPrimary,
+                              ),
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  size: 28,
+                                  color: kMutedForeground,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _imageBytes.isEmpty
+                                      ? 'Click to upload images'
+                                      : 'Add more images',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: kMutedForeground,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kForeground,
+                    side: const BorderSide(color: kBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: kPrimaryForeground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Update Doubt'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _DoubtDetailPage extends StatefulWidget {
   final DoubtApiModel doubt;
@@ -1134,6 +1578,212 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
         _currentUserName = name;
         _currentUserAvatar = _avatarFromName(name);
       });
+    }
+  }
+
+  Future<void> _editDoubt() async {
+    final result = await showDialog<DoubtApiModel>(
+      context: context,
+      builder: (_) => _EditDoubtDialog(doubt: _doubt),
+    );
+    if (result != null && mounted) {
+      setState(() => _doubt = result);
+      widget.onUpdated(_doubt);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Doubt updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteDoubt() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Doubt'),
+        content: const Text(
+          'Are you sure you want to delete this doubt? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteDoubt(_doubt.id ?? '');
+      if (success && mounted) {
+        Navigator.of(context).pop(); // Go back to list
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Doubt deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete doubt'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editComment(CommentApiModel comment) async {
+    final result = await showDialog<CommentApiModel>(
+      context: context,
+      builder: (_) =>
+          _EditCommentDialog(doubtId: _doubt.id ?? '', comment: comment),
+    );
+    if (result != null && mounted) {
+      final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+      if (updated != null) {
+        setState(() => _doubt = updated);
+        widget.onUpdated(_doubt);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comment updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteComment(String commentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text(
+          'Are you sure you want to delete this comment? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteComment(
+        _doubt.id ?? '',
+        commentId,
+      );
+      if (success && mounted) {
+        final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete comment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editReply(CommentApiModel comment, ReplyApiModel reply) async {
+    final result = await showDialog<ReplyApiModel>(
+      context: context,
+      builder: (_) => _EditReplyDialog(
+        doubtId: _doubt.id ?? '',
+        comment: comment,
+        reply: reply,
+      ),
+    );
+    if (result != null && mounted) {
+      final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+      if (updated != null) {
+        setState(() => _doubt = updated);
+        widget.onUpdated(_doubt);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reply updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteReply(String commentId, String replyId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Reply'),
+        content: const Text(
+          'Are you sure you want to delete this reply? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteReply(
+        _doubt.id ?? '',
+        commentId,
+        replyId,
+      );
+      if (success && mounted) {
+        final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reply deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete reply'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -1358,7 +2008,35 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _Badge(label: _doubt.subject ?? ''),
+                            Row(
+                              children: [
+                                _Badge(label: _doubt.subject ?? ''),
+                                if (_doubt.author == _currentUserName) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      size: 18,
+                                      color: kMutedForeground,
+                                    ),
+                                    onPressed: _editDoubt,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      size: 18,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: _deleteDoubt,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -1739,6 +2417,21 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                     ),
                                   ),
                                 ],
+                                if (comment.author == _currentUserName) ...[
+                                  const SizedBox(width: 8),
+                                  _GhostButton(
+                                    icon: Icons.edit,
+                                    label: 'Edit',
+                                    onTap: () => _editComment(comment),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _GhostButton(
+                                    icon: Icons.delete,
+                                    label: 'Delete',
+                                    onTap: () =>
+                                        _deleteComment(comment.id ?? ''),
+                                  ),
+                                ],
                               ],
                             ),
                             if (isReplying) ...[
@@ -1900,12 +2593,60 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                                     ],
                                                   ),
                                                   const SizedBox(height: 4),
-                                                  Text(
-                                                    reply.content ?? '',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: kForeground,
-                                                    ),
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          reply.content ?? '',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    kForeground,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                      if (reply.author ==
+                                                          _currentUserName) ...[
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        IconButton(
+                                                          icon: const Icon(
+                                                            Icons.edit,
+                                                            size: 14,
+                                                            color:
+                                                                kMutedForeground,
+                                                          ),
+                                                          onPressed: () =>
+                                                              _editReply(
+                                                                comment,
+                                                                reply,
+                                                              ),
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(),
+                                                        ),
+                                                        IconButton(
+                                                          icon: const Icon(
+                                                            Icons.delete,
+                                                            size: 14,
+                                                            color: Colors.red,
+                                                          ),
+                                                          onPressed: () =>
+                                                              _deleteReply(
+                                                                comment.id ??
+                                                                    '',
+                                                                reply.id ?? '',
+                                                              ),
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(),
+                                                        ),
+                                                      ],
+                                                    ],
                                                   ),
                                                 ],
                                               ),
@@ -1926,6 +2667,473 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                 ),
               );
             }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Edit Comment Dialog ─────────────────────────────────────────────────────
+
+class _EditCommentDialog extends StatefulWidget {
+  final String doubtId;
+  final CommentApiModel comment;
+  const _EditCommentDialog({required this.doubtId, required this.comment});
+  @override
+  State<_EditCommentDialog> createState() => _EditCommentDialogState();
+}
+
+class _EditCommentDialogState extends State<_EditCommentDialog> {
+  late final TextEditingController _contentCtrl;
+  List<Uint8List> _imageBytes = [];
+  bool _isPickingImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentCtrl = TextEditingController(text: widget.comment.content);
+  }
+
+  @override
+  void dispose() {
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    if (_isPickingImage) return;
+    setState(() => _isPickingImage = true);
+    try {
+      final bytes = await pickImageFromWeb();
+      if (bytes != null && mounted) {
+        setState(() => _imageBytes.add(bytes));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not pick image: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false);
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() => _imageBytes.removeAt(index));
+  }
+
+  Future<void> _submit() async {
+    if (_contentCtrl.text.trim().isEmpty &&
+        _imageBytes.isEmpty &&
+        (widget.comment.imageUrls?.isEmpty ?? true)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add content or images')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      List<String> uploadedImageUrls = List.from(
+        widget.comment.imageUrls ?? [],
+      );
+      if (_imageBytes.isNotEmpty) {
+        for (int i = 0; i < _imageBytes.length; i++) {
+          final url = await DoubtApiService.uploadImage(
+            _imageBytes[i],
+            'comment_image_$i.jpg',
+          );
+          if (url != null) {
+            uploadedImageUrls.add(url);
+          }
+        }
+      }
+
+      final success = await DoubtApiService.updateComment(
+        widget.doubtId,
+        widget.comment.id ?? '',
+        content: _contentCtrl.text.trim().isEmpty
+            ? null
+            : _contentCtrl.text.trim(),
+        imageUrls: uploadedImageUrls,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        final updated = CommentApiModel(
+          id: widget.comment.id,
+          author: widget.comment.author,
+          authorAvatar: widget.comment.authorAvatar,
+          content: _contentCtrl.text.trim(),
+          imageUrls: uploadedImageUrls,
+          createdAt: widget.comment.createdAt,
+          replies: widget.comment.replies,
+        );
+        Navigator.of(context).pop(updated);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update comment'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kRadius),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Comment',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: kForeground,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const _FormLabel('Content'),
+            const SizedBox(height: 8),
+            _StyledTextArea(
+              controller: _contentCtrl,
+              hint: 'Edit your comment...',
+              minLines: 3,
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Add Images (optional)'),
+            const SizedBox(height: 8),
+
+            Column(
+              children: [
+                if (_imageBytes.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: kBorder, width: 1.5),
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                      itemCount: _imageBytes.length,
+                      itemBuilder: (ctx, idx) => Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(kRadius),
+                            child: Image.memory(
+                              _imageBytes[idx],
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () => _removeImage(idx),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.55),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.all(3),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_imageBytes.isNotEmpty) const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _pickImage,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: kMuted,
+                      borderRadius: BorderRadius.circular(kRadius),
+                      border: Border.all(color: kBorder, width: 1.5),
+                    ),
+                    child: Center(
+                      child: _isPickingImage
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: kPrimary,
+                              ),
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  size: 24,
+                                  color: kMutedForeground,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _imageBytes.isEmpty
+                                      ? 'Click to upload images'
+                                      : 'Add more images',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: kMutedForeground,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kForeground,
+                    side: const BorderSide(color: kBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: kPrimaryForeground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Update Comment'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Edit Reply Dialog ───────────────────────────────────────────────────────
+
+class _EditReplyDialog extends StatefulWidget {
+  final String doubtId;
+  final CommentApiModel comment;
+  final ReplyApiModel reply;
+  const _EditReplyDialog({
+    required this.doubtId,
+    required this.comment,
+    required this.reply,
+  });
+  @override
+  State<_EditReplyDialog> createState() => _EditReplyDialogState();
+}
+
+class _EditReplyDialogState extends State<_EditReplyDialog> {
+  late final TextEditingController _contentCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentCtrl = TextEditingController(text: widget.reply.content);
+  }
+
+  @override
+  void dispose() {
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_contentCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please add content')));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      final updatedReply = await DoubtApiService.updateReply(
+        widget.doubtId,
+        widget.comment.id ?? '',
+        widget.reply.id ?? '',
+        author: widget.reply.author ?? '',
+        authorAvatar: widget.reply.authorAvatar ?? '',
+        content: _contentCtrl.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (updatedReply != null) {
+        Navigator.of(context).pop(updatedReply);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update reply'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kRadius),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Reply',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: kForeground,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const _FormLabel('Content'),
+            const SizedBox(height: 8),
+            _StyledTextArea(
+              controller: _contentCtrl,
+              hint: 'Edit your reply...',
+              minLines: 2,
+            ),
+
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kForeground,
+                    side: const BorderSide(color: kBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: kPrimaryForeground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Update Reply'),
+                ),
+              ],
+            ),
           ],
         ),
       ),

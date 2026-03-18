@@ -434,6 +434,47 @@ class DoubtApiService {
     }
   }
 
+  /// Update a reply
+  static Future<ReplyApiModel?> updateReply(
+    String doubtId,
+    String commentId,
+    String replyId, {
+    required String author,
+    required String authorAvatar,
+    required String content,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/$doubtId/comments/$commentId/replies/$replyId'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'author': author,
+              'authorAvatar': authorAvatar,
+              'content': content,
+            }),
+          )
+          .timeout(timeout);
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        if (json['success'] == true) {
+          return ReplyApiModel(
+            id: replyId,
+            author: author,
+            authorAvatar: authorAvatar,
+            content: content,
+            createdAt: DateTime.now().toIso8601String(),
+          );
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error updating reply: $e');
+      return null;
+    }
+  }
+
   // ============================================================================
   // FILE UPLOAD OPERATIONS
   // ============================================================================

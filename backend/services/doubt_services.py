@@ -353,6 +353,43 @@ def delete_reply(doubt_id: str, comment_id: str, reply_id: str) -> dict:
         }
 
 
+def update_reply(doubt_id: str, comment_id: str, reply_id: str, reply_update: ReplyCreate) -> dict:
+    """Update a reply"""
+    try:
+        update_data = {
+            "comments.$.replies.$[reply].author": reply_update.author,
+            "comments.$.replies.$[reply].authorAvatar": reply_update.authorAvatar,
+            "comments.$.replies.$[reply].content": reply_update.content,
+            "comments.$.replies.$[reply].updatedAt": datetime.utcnow()
+        }
+
+        result = db.doubts.update_one(
+            {
+                "_id": ObjectId(doubt_id),
+                "comments._id": comment_id,
+                "comments.replies._id": reply_id
+            },
+            {"$set": update_data},
+            array_filters=[{"reply._id": reply_id}]
+        )
+
+        if result.matched_count == 0:
+            return {
+                "success": False,
+                "message": "Doubt, comment or reply not found"
+            }
+
+        return {
+            "success": True,
+            "message": "Reply updated successfully"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error updating reply: {str(e)}"
+        }
+
+
 # ============================================================================
 # STATISTICS SERVICES
 # ============================================================================

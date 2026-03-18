@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Form, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from utils.security import hash_password, verify_password
 from db.connection import db
@@ -229,4 +229,67 @@ def reset_password(req: ResetPasswordRequest):
     db.password_otps.update_one({"_id": doc["_id"]}, {"$set": {"used": True, "used_at": datetime.now().isoformat()}})
 
     return {"message": "Password reset successful"}
+
+
+# ---------------------------------------------------------------------------
+# Streak Flow
+# ---------------------------------------------------------------------------
+@router.get("/streak/current")
+async def get_current_streak(email: str):
+    user = db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    return {
+        "current_streak": user.get("current_streak", 0),
+        "last_study_date": user.get("last_study_date"),
+        "study_dates": user.get("study_dates", [])
+    }
+
+class StreakUpdateRequest(BaseModel):
+    email: str
+
+@router.post("/streak/update")
+async def update_streak(req: StreakUpdateRequest):
+    user = db.users.find_one({"email": req.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    current_streak = user.get("current_streak", 0)
+    last_study_date = user.get("last_study_date")
+    study_dates = user.get("study_dates", [])
+    
+    if last_study_date == today_str:
+        # Already studied today, no change
+        pass
+    elif last_study_date == yesterday_str:
+        # Studied yesterday, continue streak
+        current_streak += 1
+        last_study_date = today_str
+        if today_str not in study_dates:
+            study_dates.append(today_str)
+    else:
+        # Streak broken or new streak
+        current_streak = 1
+        last_study_date = today_str
+        if today_str not in study_dates:
+            study_dates.append(today_str)
+            
+    db.users.update_one(
+        {"email": req.email},
+        {"$set": {
+            "current_streak": current_streak,
+            "last_study_date": last_study_date,
+            "study_dates": study_dates
+        }}
+    )
+    
+    return {
+        "current_streak": current_streak,
+        "last_study_date": last_study_date,
+        "study_dates": study_dates
+    }
 
