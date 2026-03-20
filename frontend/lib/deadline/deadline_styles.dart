@@ -18,13 +18,8 @@ class DeadlineStyles {
 
   /// ✅ Use getter instead of static field
   static BoxDecoration get cardDecoration => BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 10,
-            color: Colors.black12,
-          )
-        ],
-      );
+    color: card,
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: const [BoxShadow(blurRadius: 10, color: Colors.black12)],
+  );
 }

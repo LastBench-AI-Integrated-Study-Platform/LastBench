@@ -19,10 +19,14 @@ import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 
+import socketio as _sio_module
 from routes.auth_routes import router as auth_router
 from routes.insights_routes import router as insights_router
 from routes.doubt_routes import router as doubt_router
 from routes import combined_routes
+from routes.deadline_routes import router as deadline_router
+from routes.call_routes import router as call_router
+from socket_manager import sio
 
 # ================= CONFIG =================
 load_dotenv()
@@ -50,7 +54,25 @@ app.include_router(combined_routes.router, prefix="/api")
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 (UPLOAD_DIR / "doubt_images").mkdir(exist_ok=True)   # ← ensure subfolder exists too
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")  # ← ADD THIS
+from fastapi.responses import FileResponse
+import os
+
+# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+@app.get("/uploads/{file_path:path}")
+async def serve_uploaded_file(file_path: str):
+    full_path = UPLOAD_DIR / file_path
+    if full_path.exists() and full_path.is_file():
+        return FileResponse(full_path)
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="File not found")
+
+app.include_router(deadline_router)
+app.include_router(call_router)
+
+# ✅ Mount Socket.IO on top of FastAPI — run with: uvicorn app:socket_app
+socket_app = _sio_module.ASGIApp(sio, app)
+
 
 # ================= GROQ + EMBEDDINGS =================
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))

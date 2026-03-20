@@ -65,6 +65,8 @@ async def login(user: UserLogin):
     return {
         "message": "Login successful",
         "user": {
+            "_id": str(db_user["_id"]),
+            "username": db_user.get("username", ""),
             "name": db_user["name"],
             "email": db_user["email"],
             "exam": db_user["exam"],

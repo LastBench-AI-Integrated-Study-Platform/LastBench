@@ -71,9 +71,9 @@ class _DeadlineFormState extends State<DeadlineForm> {
         '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}';
 
     context.read<DeadlineProvider>().addDeadline(
-          _titleController.text.trim(),
-          dateStr,
-        );
+      _titleController.text.trim(),
+      dateStr,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -117,9 +117,14 @@ class _DeadlineFormState extends State<DeadlineForm> {
           onChanged: (_) => setState(() => _titleError = null),
           decoration: InputDecoration(
             hintText: 'Enter deadline title',
-            hintStyle: const TextStyle(color: AppColors.mutedForeground, fontSize: 14),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            hintStyle: const TextStyle(
+              color: AppColors.mutedForeground,
+              fontSize: 14,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
@@ -132,8 +137,9 @@ class _DeadlineFormState extends State<DeadlineForm> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
-                color:
-                    _titleError != null ? AppColors.overdue : AppColors.secondary,
+                color: _titleError != null
+                    ? AppColors.overdue
+                    : AppColors.secondary,
                 width: 2,
               ),
             ),
@@ -170,8 +176,11 @@ class _DeadlineFormState extends State<DeadlineForm> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today,
-                    size: 16, color: AppColors.mutedForeground),
+                const Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: AppColors.mutedForeground,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   dateLabel,
@@ -206,7 +215,8 @@ class _DeadlineFormState extends State<DeadlineForm> {
               foregroundColor: AppColors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
             child: const Text(

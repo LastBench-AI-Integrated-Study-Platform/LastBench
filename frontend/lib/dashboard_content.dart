@@ -36,7 +36,9 @@ class _DashboardContentState extends State<DashboardContent> {
 
     final deadlines = provider.deadlines;
     final totalCount = deadlines.length;
-    final completedCount = deadlines.where((d) => d.status == 'completed').length;
+    final completedCount = deadlines
+        .where((d) => d.status == 'completed')
+        .length;
     final pendingCount = deadlines.where((d) => d.status == 'pending').length;
 
     return Scaffold(
@@ -46,10 +48,7 @@ class _DashboardContentState extends State<DashboardContent> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0x0D033F63),
-              Color(0x0D379392),
-            ],
+            colors: [Color(0x0D033F63), Color(0x0D379392)],
           ),
         ),
         child: Column(
@@ -67,14 +66,16 @@ class _DashboardContentState extends State<DashboardContent> {
                       color: Color(0x0F000000),
                       blurRadius: 4,
                       offset: Offset(0, 1),
-                    )
+                    ),
                   ],
                 ),
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 16),
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
@@ -90,7 +91,9 @@ class _DashboardContentState extends State<DashboardContent> {
                         Text(
                           'Manage your deadlines efficiently',
                           style: TextStyle(
-                              fontSize: 13, color: AppColors.secondary),
+                            fontSize: 13,
+                            color: AppColors.secondary,
+                          ),
                         ),
                       ],
                     ),
@@ -107,46 +110,50 @@ class _DashboardContentState extends State<DashboardContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ── Stats Cards ─────────────────────────────────────────
-                    LayoutBuilder(builder: (context, constraints) {
-                      final isWide = constraints.maxWidth > 500;
-                      final cards = [
-                        _StatCard(
-                          label: 'Total Deadlines',
-                          value: '$totalCount',
-                          valueColor: AppColors.primary,
-                        ),
-                        _StatCard(
-                          label: 'Completed',
-                          value: '$completedCount',
-                          valueColor: AppColors.secondary,
-                        ),
-                        _StatCard(
-                          label: 'Pending',
-                          value: '$pendingCount',
-                          valueColor: const Color(0xFFEA580C),
-                        ),
-                      ];
-                      if (isWide) {
-                        return Row(
-                          children: [
-                            Expanded(child: cards[0]),
-                            const SizedBox(width: 16),
-                            Expanded(child: cards[1]),
-                            const SizedBox(width: 16),
-                            Expanded(child: cards[2]),
-                          ],
-                        );
-                      } else {
-                        return Column(
-                          children: cards
-                              .map((c) => Padding(
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth > 500;
+                        final cards = [
+                          _StatCard(
+                            label: 'Total Deadlines',
+                            value: '$totalCount',
+                            valueColor: AppColors.primary,
+                          ),
+                          _StatCard(
+                            label: 'Completed',
+                            value: '$completedCount',
+                            valueColor: AppColors.secondary,
+                          ),
+                          _StatCard(
+                            label: 'Pending',
+                            value: '$pendingCount',
+                            valueColor: const Color(0xFFEA580C),
+                          ),
+                        ];
+                        if (isWide) {
+                          return Row(
+                            children: [
+                              Expanded(child: cards[0]),
+                              const SizedBox(width: 16),
+                              Expanded(child: cards[1]),
+                              const SizedBox(width: 16),
+                              Expanded(child: cards[2]),
+                            ],
+                          );
+                        } else {
+                          return Column(
+                            children: cards
+                                .map(
+                                  (c) => Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: c,
-                                  ))
-                              .toList(),
-                        );
-                      }
-                    }),
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        }
+                      },
+                    ),
 
                     const SizedBox(height: 24),
 
@@ -155,7 +162,9 @@ class _DashboardContentState extends State<DashboardContent> {
                       onTap: () => setState(() => _showForm = !_showForm),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary,
                           borderRadius: BorderRadius.circular(8),
@@ -164,7 +173,7 @@ class _DashboardContentState extends State<DashboardContent> {
                               color: AppColors.primary.withOpacity(0.3),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
-                            )
+                            ),
                           ],
                         ),
                         child: Text(
@@ -195,7 +204,7 @@ class _DashboardContentState extends State<DashboardContent> {
                               color: Colors.black.withOpacity(0.05),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
-                            )
+                            ),
                           ],
                         ),
                         child: DeadlineForm(
@@ -210,7 +219,10 @@ class _DashboardContentState extends State<DashboardContent> {
                     Container(
                       decoration: const BoxDecoration(
                         border: Border(
-                          bottom: BorderSide(color: Color(0x33379392), width: 1),
+                          bottom: BorderSide(
+                            color: Color(0x33379392),
+                            width: 1,
+                          ),
                         ),
                       ),
                       child: Row(
@@ -269,13 +281,15 @@ class _StatCard extends StatelessWidget {
         color: AppColors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-            color: AppColors.secondary.withOpacity(0.2), width: 1),
+          color: AppColors.secondary.withOpacity(0.2),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
             blurRadius: 4,
             offset: const Offset(0, 2),
-          )
+          ),
         ],
       ),
       child: Column(

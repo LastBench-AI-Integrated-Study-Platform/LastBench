@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_service.dart';
 import 'services/doubt_api_service.dart';
 
 // ─── Colour Palette ───────────────────────────────────────────────────────────
@@ -25,34 +26,37 @@ const Color kAccent = Color(0xFF2E8888);
 const double kRadius = 10.0;
 
 // ─── Web image picker (dart:html, no package) ─────────────────────────────────
-Future<Uint8List?> pickImageFromWeb() async {
-  final completer = Completer<Uint8List?>();
+Future<List<Uint8List>> pickImagesFromWeb() async {
+  final completer = Completer<List<Uint8List>>();
 
   final input = html.FileUploadInputElement()
     ..accept = 'image/*'
+    ..multiple = true
     ..click();
 
-  input.onChange.listen((event) {
-    final file = input.files?.first;
-    if (file == null) {
-      completer.complete(null);
+  input.onChange.listen((event) async {
+    final files = input.files;
+    if (files == null || files.isEmpty) {
+      completer.complete([]);
       return;
     }
-    final reader = html.FileReader();
-    reader.readAsArrayBuffer(file);
-    reader.onLoadEnd.listen((_) {
+    
+    List<Uint8List> allBytes = [];
+    for (var file in files) {
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoadEnd.first;
       final result = reader.result;
       if (result is ByteBuffer) {
-        completer.complete(result.asUint8List());
+        allBytes.add(result.asUint8List());
       } else if (result is Uint8List) {
-        completer.complete(result);
-      } else {
-        completer.complete(null);
+        allBytes.add(result);
       }
-    });
+    }
+    completer.complete(allBytes);
   });
 
-  input.onAbort.listen((_) => completer.complete(null));
+  input.onAbort.listen((_) => completer.complete([]));
 
   return completer.future;
 }
@@ -60,8 +64,7 @@ Future<Uint8List?> pickImageFromWeb() async {
 // ─── User helpers ───────────────────────────────────────────────────────────
 Future<String> _loadUserName() async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_name') ?? 'You';
+    return AuthService.getUserName() ?? 'You';
   } catch (_) {
     return 'You';
   }
@@ -907,9 +910,9 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
     if (_isPickingImage) return;
     setState(() => _isPickingImage = true);
     try {
-      final bytes = await pickImageFromWeb();
-      if (bytes != null && mounted) {
-        setState(() => _imageBytes.add(bytes));
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _imageBytes.addAll(bytesList));
       }
     } catch (e) {
       if (mounted) {
@@ -1249,9 +1252,9 @@ class _EditDoubtDialogState extends State<_EditDoubtDialog> {
     if (_isPickingImage) return;
     setState(() => _isPickingImage = true);
     try {
-      final bytes = await pickImageFromWeb();
-      if (bytes != null && mounted) {
-        setState(() => _imageBytes.add(bytes));
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _imageBytes.addAll(bytesList));
       }
     } catch (e) {
       if (mounted) {
@@ -1791,9 +1794,9 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
     if (_isPickingCommentImage) return;
     setState(() => _isPickingCommentImage = true);
     try {
-      final bytes = await pickImageFromWeb();
-      if (bytes != null && mounted) {
-        setState(() => _commentImageBytes.add(bytes));
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _commentImageBytes.addAll(bytesList));
       }
     } catch (e) {
       if (mounted) {
@@ -2705,9 +2708,9 @@ class _EditCommentDialogState extends State<_EditCommentDialog> {
     if (_isPickingImage) return;
     setState(() => _isPickingImage = true);
     try {
-      final bytes = await pickImageFromWeb();
-      if (bytes != null && mounted) {
-        setState(() => _imageBytes.add(bytes));
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _imageBytes.addAll(bytesList));
       }
     } catch (e) {
       if (mounted) {

@@ -7,11 +7,12 @@ import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
-import 'chat_home_page.dart';
+import 'pages/call_contacts_page.dart';import 'chat_home_page.dart';
 import 'doubt_section.dart';
 import 'login_page.dart';
 import 'profile_creation_page.dart';
 import 'services/streak_service.dart';
+import 'services/auth_service.dart';
 
 class LastBenchHome extends StatefulWidget {
   final String? userName;
@@ -38,6 +39,9 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   // Profile state
   String? _profileImageBase64;
 
+  String? get currentEmail => widget.userEmail ?? AuthService.getUserEmail();
+  String? get currentUserName => widget.userName ?? AuthService.getUserName();
+
   @override
   void initState() {
     super.initState();
@@ -46,14 +50,14 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   }
 
   Future<void> _loadStreak() async {
-    if (widget.userEmail == null) {
+    if (currentEmail == null) {
       setState(() => _isStreakLoading = false);
       return;
     }
 
     try {
       final streakData = await StreakService.getCurrentStreak(
-        widget.userEmail!,
+        currentEmail!,
       );
       setState(() {
         _currentStreak = streakData['current_streak'] ?? 0;
@@ -73,10 +77,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   }
 
   Future<void> _updateStreak() async {
-    if (widget.userEmail == null) return;
+    if (currentEmail == null) return;
 
     try {
-      final streakData = await StreakService.updateStreak(widget.userEmail!);
+      final streakData = await StreakService.updateStreak(currentEmail!);
       setState(() {
         _currentStreak = streakData['current_streak'] ?? 0;
       });
@@ -99,6 +103,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    await AuthService.logout();
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -213,7 +218,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Hey ${widget.userName ?? 'Dude'}! 👋",
+                        "Hey ${currentUserName ?? 'Student'}! 👋",
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 26,
@@ -276,7 +281,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => ProfileCreationPage(
-                                userEmail: widget.userEmail,
+                                userEmail: currentEmail,
                               ),
                             ),
                           ).then((_) => _loadProfileImage());
@@ -285,7 +290,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => ProfileCreationPage(
-                                userEmail: widget.userEmail,
+                                userEmail: currentEmail,
                                 isEditing: true,
                               ),
                             ),
@@ -372,6 +377,13 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                         } else if (action["title"] == "Ask a Doubt") {
                           // ← scroll to doubts section
                           _scrollToDoubts();
+                        } else if (action["title"] == "Join Study Call") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CallContactsPage(),
+                            ),
+                          );
                         }
                       },
                       child: Card(
@@ -419,13 +431,13 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               ),
             ),
 
-            // ── Daily Insights ────────────────────────────────────────────
+            // Daily Insights (Dynamic)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: DailyInsightsCard(),
             ),
 
-            // ── Study Rooms Header ────────────────────────────────────────
+            // Study Rooms Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(

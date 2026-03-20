@@ -13,7 +13,11 @@ class DeadlineList extends StatefulWidget {
 class _DeadlineListState extends State<DeadlineList> {
   String? _deleteConfirm;
 
-  void _handleStatusChange(BuildContext context, String id, String currentStatus) {
+  void _handleStatusChange(
+    BuildContext context,
+    String id,
+    String currentStatus,
+  ) {
     final newStatus = currentStatus == 'pending' ? 'completed' : 'pending';
     context.read<DeadlineProvider>().updateDeadlineStatus(id, newStatus);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -36,7 +40,10 @@ class _DeadlineListState extends State<DeadlineList> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: AppColors.overdue,
-        content: const Text('Deleted ✓', style: TextStyle(color: AppColors.white)),
+        content: const Text(
+          'Deleted ✓',
+          style: TextStyle(color: AppColors.white),
+        ),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -47,7 +54,8 @@ class _DeadlineListState extends State<DeadlineList> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DeadlineProvider>();
-    final sorted = [...provider.deadlines]..sort((a, b) {
+    final sorted = [...provider.deadlines]
+      ..sort((a, b) {
         if (a.status != b.status) return a.status == 'pending' ? -1 : 1;
         return DateTime.parse(a.date).compareTo(DateTime.parse(b.date));
       });
@@ -61,14 +69,22 @@ class _DeadlineListState extends State<DeadlineList> {
             children: const [
               Text('📭', style: TextStyle(fontSize: 48)),
               SizedBox(height: 16),
-              Text('No deadlines yet',
-                  style: TextStyle(
-                      color: AppColors.mutedForeground,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500)),
+              Text(
+                'No deadlines yet',
+                style: TextStyle(
+                  color: AppColors.mutedForeground,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               SizedBox(height: 4),
-              Text('Add one to get started!',
-                  style: TextStyle(color: AppColors.mutedForeground, fontSize: 14)),
+              Text(
+                'Add one to get started!',
+                style: TextStyle(
+                  color: AppColors.mutedForeground,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),
@@ -85,12 +101,21 @@ class _DeadlineListState extends State<DeadlineList> {
         final deadlineDate = DateTime.parse(deadline.date);
         final today = DateTime.now();
         final todayNorm = DateTime(today.year, today.month, today.day);
-        final deadlineNorm = DateTime(deadlineDate.year, deadlineDate.month, deadlineDate.day);
+        final deadlineNorm = DateTime(
+          deadlineDate.year,
+          deadlineDate.month,
+          deadlineDate.day,
+        );
 
-        final isOverdue = deadlineNorm.isBefore(todayNorm) && deadline.status == 'pending';
+        final isOverdue =
+            deadlineNorm.isBefore(todayNorm) && deadline.status == 'pending';
         final isToday = deadlineNorm == todayNorm;
         final daysDiff = deadlineNorm.difference(todayNorm).inDays;
-        final isSoon = !isToday && !isOverdue && daysDiff <= 3 && deadline.status == 'pending';
+        final isSoon =
+            !isToday &&
+            !isOverdue &&
+            daysDiff <= 3 &&
+            deadline.status == 'pending';
         final isCompleted = deadline.status == 'completed';
 
         // Card colors
@@ -114,7 +139,20 @@ class _DeadlineListState extends State<DeadlineList> {
 
         // Format date
         final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
         final dateLabel =
             '📅 ${weekdays[deadlineDate.weekday - 1]}, ${months[deadlineDate.month - 1]} ${deadlineDate.day}, ${deadlineDate.year}';
 
@@ -137,8 +175,12 @@ class _DeadlineListState extends State<DeadlineList> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: isCompleted ? AppColors.mutedForeground : AppColors.primary,
-                        decoration: isCompleted ? TextDecoration.lineThrough : null,
+                        color: isCompleted
+                            ? AppColors.mutedForeground
+                            : AppColors.primary,
+                        decoration: isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -147,31 +189,42 @@ class _DeadlineListState extends State<DeadlineList> {
                         Text(
                           dateLabel,
                           style: const TextStyle(
-                              color: AppColors.mutedForeground, fontSize: 13),
+                            color: AppColors.mutedForeground,
+                            fontSize: 13,
+                          ),
                         ),
                         if (isOverdue) ...[
                           const SizedBox(width: 8),
-                          const Text('OVERDUE',
-                              style: TextStyle(
-                                  color: AppColors.overdue,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold)),
+                          const Text(
+                            'OVERDUE',
+                            style: TextStyle(
+                              color: AppColors.overdue,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                         if (isToday) ...[
                           const SizedBox(width: 8),
-                          const Text('TODAY',
-                              style: TextStyle(
-                                  color: AppColors.today,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold)),
+                          const Text(
+                            'TODAY',
+                            style: TextStyle(
+                              color: AppColors.today,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                         if (isSoon) ...[
                           const SizedBox(width: 8),
-                          const Text('SOON',
-                              style: TextStyle(
-                                  color: AppColors.upcoming,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold)),
+                          const Text(
+                            'SOON',
+                            style: TextStyle(
+                              color: AppColors.upcoming,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -188,11 +241,16 @@ class _DeadlineListState extends State<DeadlineList> {
                   // Status toggle button
                   _OutlineButton(
                     label: isCompleted ? 'Mark Pending' : 'Mark Done',
-                    onPressed: () =>
-                        _handleStatusChange(context, deadline.id, deadline.status),
+                    onPressed: () => _handleStatusChange(
+                      context,
+                      deadline.id,
+                      deadline.status,
+                    ),
                     filled: !isCompleted,
                     fillColor: AppColors.secondary,
-                    textColor: isCompleted ? AppColors.secondary : AppColors.white,
+                    textColor: isCompleted
+                        ? AppColors.secondary
+                        : AppColors.white,
                     borderColor: AppColors.secondary,
                   ),
                   const SizedBox(height: 6),
@@ -212,7 +270,8 @@ class _DeadlineListState extends State<DeadlineList> {
                         const SizedBox(width: 6),
                         _OutlineButton(
                           label: 'Cancel',
-                          onPressed: () => setState(() => _deleteConfirm = null),
+                          onPressed: () =>
+                              setState(() => _deleteConfirm = null),
                           filled: false,
                           textColor: AppColors.primary,
                           borderColor: AppColors.primary,
@@ -269,7 +328,10 @@ class _OutlineButton extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
         ),
       ),
     );
