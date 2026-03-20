@@ -7,6 +7,9 @@ import 'dart:convert';
 import 'dart:io' show File;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'login_page.dart';
+import 'services/profile_service.dart';
+
 class ProfileCreationPage extends StatefulWidget {
   final String? userEmail;
   final bool isEditing;
@@ -191,7 +194,14 @@ class _ProfileCreationPageState extends State<ProfileCreationPage>
 
   /// Returns the correct [ImageProvider] for the current platform.
   ImageProvider? get _imageProvider {
-    if (kIsWeb && _webImageBytes != null) return MemoryImage(_webImageBytes!);
+    if (_webImageBytes != null) return MemoryImage(_webImageBytes!);
+    if (_profileImageBase64 != null && _profileImageBase64!.isNotEmpty) {
+      try {
+        return MemoryImage(base64Decode(_profileImageBase64!));
+      } catch (_) {
+        // ignore malformed base64; fallback to local file
+      }
+    }
     if (!kIsWeb && _nativeImageFile != null)
       return FileImage(_nativeImageFile!);
     return null;
@@ -200,18 +210,73 @@ class _ProfileCreationPageState extends State<ProfileCreationPage>
   // ── Data ──────────────────────────────────────────────────────────────────
 
   Future<void> _loadProfileData() async {
+    String name = '';
+    String bio = '';
+    String education = '';
+    String internship = '';
+    String job = '';
+    String skills = '';
+    String profileImageBase64 = '';
+
+    if (widget.userEmail != null) {
+      try {
+        final profile = await ProfileService.getProfile(widget.userEmail!);
+        name = profile['name'] as String? ?? '';
+        bio = profile['bio'] as String? ?? '';
+        education = profile['education'] as String? ?? '';
+        internship = profile['internship'] as String? ?? '';
+        job = profile['job'] as String? ?? '';
+        skills = profile['skills'] as String? ?? '';
+        profileImageBase64 = profile['profile_image_base64'] as String? ?? '';
+
+        if (profileImageBase64.isNotEmpty) {
+          _profileImageBase64 = profileImageBase64;
+          _webImageBytes = base64Decode(profileImageBase64);
+        }
+      } catch (e) {
+        // if backend fails, we fallback to local data
+      }
+    }
+
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      nameController.text = prefs.getString('profile_name') ?? '';
-      bioController.text = prefs.getString('profile_bio') ?? '';
-      educationController.text = prefs.getString('profile_education') ?? '';
-      internshipController.text = prefs.getString('profile_internship') ?? '';
-      jobController.text = prefs.getString('profile_job') ?? '';
-      skillsController.text = prefs.getString('profile_skills') ?? '';
-      final base64 = prefs.getString('profile_image_base64');
-      if (base64 != null) {
-        _webImageBytes = base64Decode(base64);
+      nameController.text = name.isNotEmpty
+          ? name
+          : prefs.getString('profile_name') ?? '';
+      bioController.text = bio.isNotEmpty
+          ? bio
+          : prefs.getString('profile_bio') ?? '';
+      educationController.text = education.isNotEmpty
+          ? education
+          : prefs.getString('profile_education') ?? '';
+      internshipController.text = internship.isNotEmpty
+          ? internship
+          : prefs.getString('profile_internship') ?? '';
+      jobController.text = job.isNotEmpty
+          ? job
+          : prefs.getString('profile_job') ?? '';
+      skillsController.text = skills.isNotEmpty
+          ? skills
+          : prefs.getString('profile_skills') ?? '';
+
+      if (_profileImageBase64 == null || _profileImageBase64!.isEmpty) {
+        final base64 = prefs.getString('profile_image_base64');
+        if (base64 != null && base64.isNotEmpty) {
+          _profileImageBase64 = base64;
+          _webImageBytes = base64Decode(base64);
+        }
       }
+
+      _fieldCompletion['name'] = nameController.text.isNotEmpty;
+      _fieldCompletion['bio'] = bioController.text.isNotEmpty;
+      _fieldCompletion['education'] = educationController.text.isNotEmpty;
+      _fieldCompletion['internship'] = internshipController.text.isNotEmpty;
+      _fieldCompletion['job'] = jobController.text.isNotEmpty;
+      _fieldCompletion['skills'] = skillsController.text.isNotEmpty;
+      _fieldCompletion['photo'] =
+          _profileImageBase64 != null && _profileImageBase64!.isNotEmpty;
+
+      _animateProgress();
     });
   }
 
@@ -267,6 +332,30 @@ class _ProfileCreationPageState extends State<ProfileCreationPage>
     await prefs.setString('profile_skills', skillsController.text);
     if (_profileImageBase64 != null) {
       await prefs.setString('profile_image_base64', _profileImageBase64!);
+    }
+
+    if (widget.userEmail != null) {
+      try {
+        await ProfileService.updateProfile(
+          email: widget.userEmail!,
+          name: nameController.text,
+          bio: bioController.text,
+          education: educationController.text,
+          internship: internshipController.text,
+          job: jobController.text,
+          skills: skillsController.text,
+          profileImageBase64: _profileImageBase64,
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not sync profile to server: $e'),
+              backgroundColor: Colors.orange.shade700,
+            ),
+          );
+        }
+      }
     }
 
     setState(() => _isSaving = false);
@@ -425,6 +514,44 @@ class _ProfileCreationPageState extends State<ProfileCreationPage>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+  }
+
+  void _confirmLogout() {
+    showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: cardBg,
+        title: Text('Logout', style: TextStyle(color: textPrimary)),
+        content: Text(
+          'Do you really want to log out?',
+          style: TextStyle(color: textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancel', style: TextStyle(color: teal)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(true);
+              _logout();
+            },
+            child: Text('Logout', style: TextStyle(color: gold)),
+          ),
+        ],
       ),
     );
   }
@@ -721,6 +848,35 @@ class _ProfileCreationPageState extends State<ProfileCreationPage>
                                 ),
                               ),
                             ),
+
+                          // Logout toggle-style button near avatar
+                          Positioned(
+                            top: -10,
+                            right: -10,
+                            child: GestureDetector(
+                              onTap: _confirmLogout,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: cardBg.withOpacity(0.9),
+                                  border: Border.all(color: gold, width: 1.5),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.25),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.power_settings_new,
+                                  color: gold,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),

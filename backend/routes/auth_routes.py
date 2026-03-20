@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from utils.security import hash_password, verify_password
 from db.connection import db
-from models.user_model import UserSignup, UserLogin
+from models.user_model import UserSignup, UserLogin, UserProfile
 
 # Models for reset flow
 class ResetCreate(BaseModel):
@@ -39,6 +39,12 @@ async def signup(user: UserSignup):
         "email": user.email,
         "password": hash_password(user.password),
         "exam": user.exam,
+        "bio": "",
+        "education": "",
+        "internship": "",
+        "job": "",
+        "skills": "",
+        "profile_image_base64": "",
         "current_streak": 0,
         "last_study_date": None,
         "study_dates": []
@@ -62,9 +68,72 @@ async def login(user: UserLogin):
             "name": db_user["name"],
             "email": db_user["email"],
             "exam": db_user["exam"],
+            "bio": db_user.get("bio", ""),
+            "education": db_user.get("education", ""),
+            "internship": db_user.get("internship", ""),
+            "job": db_user.get("job", ""),
+            "skills": db_user.get("skills", ""),
+            "profile_image_base64": db_user.get("profile_image_base64", ""),
             "current_streak": db_user.get("current_streak", 0),
             "last_study_date": db_user.get("last_study_date"),
             "study_dates": db_user.get("study_dates", [])
+        }
+    }
+
+
+@router.get("/profile")
+async def get_profile(email: str):
+    user = db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "email": user["email"],
+        "name": user.get("name", ""),
+        "bio": user.get("bio", ""),
+        "education": user.get("education", ""),
+        "internship": user.get("internship", ""),
+        "job": user.get("job", ""),
+        "skills": user.get("skills", ""),
+        "profile_image_base64": user.get("profile_image_base64", ""),
+        "exam": user.get("exam", ""),
+    }
+
+
+@router.post("/profile")
+async def update_profile(profile: UserProfile):
+    user = db.users.find_one({"email": profile.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_data = {
+        "name": profile.name or user.get("name", ""),
+        "bio": profile.bio or "",
+        "education": profile.education or "",
+        "internship": profile.internship or "",
+        "job": profile.job or "",
+        "skills": profile.skills or "",
+        "profile_image_base64": profile.profile_image_base64 or "",
+    }
+
+    # keep exam if not provided
+    if profile.name:
+        update_data["name"] = profile.name
+
+    db.users.update_one({"email": profile.email}, {"$set": update_data})
+
+    updated_user = db.users.find_one({"email": profile.email})
+    return {
+        "message": "Profile updated",
+        "profile": {
+            "email": updated_user["email"],
+            "name": updated_user.get("name", ""),
+            "bio": updated_user.get("bio", ""),
+            "education": updated_user.get("education", ""),
+            "internship": updated_user.get("internship", ""),
+            "job": updated_user.get("job", ""),
+            "skills": updated_user.get("skills", ""),
+            "profile_image_base64": updated_user.get("profile_image_base64", ""),
         }
     }
 
