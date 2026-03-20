@@ -18,10 +18,13 @@ import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 
+import socketio as _sio_module
 from routes.auth_routes import router as auth_router
 from routes.insights_routes import router as insights_router
-from routes import combined_routes 
+from routes import combined_routes
 from routes.deadline_routes import router as deadline_router
+from routes.call_routes import router as call_router
+from socket_manager import sio
 
 # ================= CONFIG =================
 load_dotenv()
@@ -43,6 +46,10 @@ app.include_router(auth_router)
 app.include_router(insights_router)
 app.include_router(combined_routes.router, prefix="/api")
 app.include_router(deadline_router)
+app.include_router(call_router)
+
+# ✅ Mount Socket.IO on top of FastAPI — run with: uvicorn app:socket_app
+socket_app = _sio_module.ASGIApp(sio, app)
 
 
 # ================= GROQ + EMBEDDINGS =================

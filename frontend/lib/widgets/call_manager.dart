@@ -20,17 +20,19 @@ class _CallManagerState extends State<CallManager> {
     super.initState();
     SocketService().onIncomingCall((data) {
       if (!mounted) return;
-      Navigator.of(context).push(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => IncomingCallPage(
-          callerId:       data['callerId']       ?? '',
-          callerName:     data['callerName']     ?? 'Unknown',
-          callerInitials: data['callerInitials'] ?? '?',
-          channel:        data['channel']        ?? '',
-          callType:       data['callType']       ?? 'video',
-          logId:          data['logId']?.toString() ?? '',
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => IncomingCallPage(
+            callerId: data['callerId'] ?? '',
+            callerName: data['callerName'] ?? 'Unknown',
+            callerInitials: data['callerInitials'] ?? '?',
+            channel: data['channel'] ?? '',
+            callType: data['callType'] ?? 'video',
+            logId: data['logId']?.toString() ?? '',
+          ),
         ),
-      ));
+      );
     });
   }
 

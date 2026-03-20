@@ -14,13 +14,12 @@ class SocketService {
 
   void connect(String userId, {String? serverUrl}) {
     if (_connected) return;
-  
-  final url = 'http://192.168.0.150:8000';
+    final url = 'http://127.0.0.1:8000';
 
     _socket = IO.io(
       url,
       IO.OptionBuilder()
-          .setTransports(['websocket','polling']) // IMPORTANT
+          .setTransports(['websocket', 'polling']) // IMPORTANT
           .enableAutoConnect()
           .setAuth({'user_id': userId})
           .setTimeout(5000)
@@ -69,24 +68,15 @@ class SocketService {
   }
 
   void acceptCall(String callerId, String logId) {
-    _socket?.emit('call_accept', {
-      'callerId': callerId,
-      'logId': logId,
-    });
+    _socket?.emit('call_accept', {'callerId': callerId, 'logId': logId});
   }
 
   void rejectCall(String callerId, String logId) {
-    _socket?.emit('call_reject', {
-      'callerId': callerId,
-      'logId': logId,
-    });
+    _socket?.emit('call_reject', {'callerId': callerId, 'logId': logId});
   }
 
   void endCall(String otherUserId, String logId) {
-    _socket?.emit('call_end', {
-      'otherUserId': otherUserId,
-      'logId': logId,
-    });
+    _socket?.emit('call_end', {'otherUserId': otherUserId, 'logId': logId});
   }
 
   // ───── LISTEN EVENTS ───────────────────────────

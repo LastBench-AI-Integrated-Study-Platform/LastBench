@@ -5,6 +5,7 @@ import 'signup_page.dart';
 import 'last_bench_home.dart';
 import 'deadline_tracker_page.dart';
 import 'deadline_provider.dart';
+import 'widgets/call_manager.dart';
 
 void main() {
   runApp(const LastBenchApp());
@@ -20,14 +21,12 @@ class LastBenchApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Last Bench',
-        theme: ThemeData(
-          primaryColor: const Color(0xFF033F63),
-        ),
+        theme: ThemeData(primaryColor: const Color(0xFF033F63)),
         initialRoute: '/login', // ✅ always start at login
         routes: {
-          '/login':    (context) => const LoginPage(),
-          '/signup':   (context) => const SignupPage(),
-          '/home':     (context) => const LastBenchHome(),
+          '/login': (context) => const LoginPage(),
+          '/signup': (context) => const SignupPage(),
+          '/home': (context) => CallManager(child: const LastBenchHome()),
           '/deadline': (context) => const DeadlineTrackerPage(),
         },
       ),

@@ -121,8 +121,7 @@ class _LandingPageState extends State<LandingPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  const DeadlineTrackerPage(),
+                              builder: (_) => const DeadlineTrackerPage(),
                             ),
                           );
                         },
@@ -169,11 +168,11 @@ class _LandingPageState extends State<LandingPage> {
                     itemCount: features.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.35,
-                    ),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 1.35,
+                        ),
                     itemBuilder: (context, index) {
                       final f = features[index];
                       return Card(

@@ -48,10 +48,7 @@ class AuthService {
     final res = await http.post(
       Uri.parse("$baseUrl/auth/login"),
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "email": email,
-        "password": password,
-      }),
+      body: jsonEncode({"email": email, "password": password}),
     );
     final data = jsonDecode(res.body);
     if (res.statusCode != 200) throw data["detail"];

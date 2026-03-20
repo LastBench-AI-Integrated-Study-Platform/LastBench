@@ -35,6 +35,11 @@ async def disconnect(sid):
             del online_users[user_id]
             print(f"User {user_id} removed from online list")
 
+    for user_id, stored_sid in list(connected_users.items()):
+        if stored_sid == sid:
+            del connected_users[user_id]
+            print(f"User {user_id} removed from connected list")
+
 @sio.on("user_register")
 async def user_register(sid, user_id):
     connected_users[user_id] = sid

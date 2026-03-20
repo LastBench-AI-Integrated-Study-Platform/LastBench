@@ -182,10 +182,14 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
-    _pulseAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
-      ..repeat(reverse: true);
-    _waveAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
-      ..repeat(reverse: true);
+    _pulseAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+    _waveAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
 
     // Simulate connection (replace with _agora.init(...) below)
     _connectTimer = Timer(const Duration(seconds: 2), _onConnected);
@@ -342,17 +346,29 @@ class _Header extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             isVideoMode ? 'Video Call' : 'Voice Call',
-            style: const TextStyle(color: _primary, fontSize: 17, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: _primary,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(width: 10),
           Text(
             isConnecting ? 'Connecting...' : '$participantCount members',
-            style: const TextStyle(color: _secondary, fontSize: 13, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              color: _secondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const Spacer(),
           Text(
             isConnecting ? '00:00' : formattedTime,
-            style: const TextStyle(color: _muted, fontSize: 13, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              color: _muted,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -386,11 +402,19 @@ class _ConnectingView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
-          const Text('Joining study call...',
-              style: TextStyle(color: _primary, fontSize: 18, fontWeight: FontWeight.w600)),
+          const Text(
+            'Joining study call...',
+            style: TextStyle(
+              color: _primary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 8),
-          const Text('Connecting to your study group',
-              style: TextStyle(color: _muted, fontSize: 14)),
+          const Text(
+            'Connecting to your study group',
+            style: TextStyle(color: _muted, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -433,16 +457,20 @@ class _VideoGrid extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Row(
-                children: remotes.map((p) => Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 5),
-                    child: _VideoTile(
-                      label: p.name,
-                      child: _RemoteVideoPlaceholder(participant: p),
-                      // child: agoraService?.remoteView(p.uid) ?? _RemoteVideoPlaceholder(participant: p),
-                    ),
-                  ),
-                )).toList(),
+                children: remotes
+                    .map(
+                      (p) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          child: _VideoTile(
+                            label: p.name,
+                            child: _RemoteVideoPlaceholder(participant: p),
+                            // child: agoraService?.remoteView(p.uid) ?? _RemoteVideoPlaceholder(participant: p),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ),
         ],
@@ -456,7 +484,11 @@ class _VideoTile extends StatelessWidget {
   final String label;
   final bool isMain;
 
-  const _VideoTile({required this.child, required this.label, this.isMain = false});
+  const _VideoTile({
+    required this.child,
+    required this.label,
+    this.isMain = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -464,7 +496,13 @@ class _VideoTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: _primary,
         borderRadius: BorderRadius.circular(isMain ? 16 : 12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -480,7 +518,14 @@ class _VideoTile extends StatelessWidget {
                 color: Colors.black.withOpacity(0.45),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
         ],
@@ -497,17 +542,35 @@ class _LocalVideoPlaceholder extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 60, height: 60,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: _secondary.withOpacity(0.2)),
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _secondary.withOpacity(0.2),
+            ),
             child: const Icon(Icons.videocam, color: _secondary, size: 30),
           ),
           const SizedBox(height: 10),
-          const Text('Your Camera', style: TextStyle(color: Colors.white, fontSize: 14)),
+          const Text(
+            'Your Camera',
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: Colors.green.withOpacity(0.25), borderRadius: BorderRadius.circular(10)),
-            child: const Text('LIVE', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Text(
+              'LIVE',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              ),
+            ),
           ),
         ],
       ),
@@ -527,7 +590,10 @@ class _CameraOffPlaceholder extends StatelessWidget {
         children: [
           const Icon(Icons.videocam_off, color: Colors.white38, size: 36),
           const SizedBox(height: 8),
-          Text(name, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+          Text(
+            name,
+            style: const TextStyle(color: Colors.white54, fontSize: 13),
+          ),
         ],
       ),
     );
@@ -545,15 +611,28 @@ class _RemoteVideoPlaceholder extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 52, height: 52,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: _secondary),
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: _secondary,
+            ),
             child: Center(
-              child: Text(participant.initials,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              child: Text(
+                participant.initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),
-          Text(participant.name, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(
+            participant.name,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
         ],
       ),
     );
@@ -583,11 +662,19 @@ class _VoiceView extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 16),
-          const Text('Voice Call Active',
-              style: TextStyle(color: _primary, fontSize: 26, fontWeight: FontWeight.w700)),
+          const Text(
+            'Voice Call Active',
+            style: TextStyle(
+              color: _primary,
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text('${participants.length} members connected',
-              style: const TextStyle(color: _secondary, fontSize: 15)),
+          Text(
+            '${participants.length} members connected',
+            style: const TextStyle(color: _secondary, fontSize: 15),
+          ),
           const SizedBox(height: 40),
           // ── Animated waveform ────────────────────────────────────────
           SizedBox(
@@ -599,13 +686,17 @@ class _VoiceView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: List.generate(9, (i) {
                   final t = (waveAnim.value + i * 0.12) % 1.0;
-                  final h = isMuted ? 8.0 : (16.0 + 52.0 * (0.5 + 0.5 * (t * 2 - 1).abs()));
+                  final h = isMuted
+                      ? 8.0
+                      : (16.0 + 52.0 * (0.5 + 0.5 * (t * 2 - 1).abs()));
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 3),
                     width: 5,
                     height: h.clamp(8.0, 80.0),
                     decoration: BoxDecoration(
-                      color: isMuted ? _secondary.withOpacity(0.25) : _secondary,
+                      color: isMuted
+                          ? _secondary.withOpacity(0.25)
+                          : _secondary,
                       borderRadius: BorderRadius.circular(3),
                     ),
                   );
@@ -630,11 +721,21 @@ class _VoiceView extends StatelessWidget {
                   child: Row(
                     children: [
                       Container(
-                        width: 42, height: 42,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: _secondary),
+                        width: 42,
+                        height: 42,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _secondary,
+                        ),
                         child: Center(
-                          child: Text(p.initials,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                          child: Text(
+                            p.initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -642,9 +743,18 @@ class _VoiceView extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(p.name,
-                                style: const TextStyle(color: _primary, fontWeight: FontWeight.w500, fontSize: 14)),
-                            const Text('Connected', style: TextStyle(color: _muted, fontSize: 11)),
+                            Text(
+                              p.name,
+                              style: const TextStyle(
+                                color: _primary,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const Text(
+                              'Connected',
+                              style: TextStyle(color: _muted, fontSize: 11),
+                            ),
                           ],
                         ),
                       ),
@@ -652,10 +762,13 @@ class _VoiceView extends StatelessWidget {
                         AnimatedBuilder(
                           animation: pulseAnim,
                           builder: (_, __) => Container(
-                            width: 8, height: 8,
+                            width: 8,
+                            height: 8,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _secondary.withOpacity(0.4 + 0.6 * pulseAnim.value),
+                              color: _secondary.withOpacity(
+                                0.4 + 0.6 * pulseAnim.value,
+                              ),
                             ),
                           ),
                         ),
@@ -690,8 +803,14 @@ class _ParticipantsSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Participants',
-              style: TextStyle(color: _primary, fontSize: 15, fontWeight: FontWeight.w600)),
+          const Text(
+            'Participants',
+            style: TextStyle(
+              color: _primary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 12),
           Expanded(
             child: ListView.separated(
@@ -708,11 +827,21 @@ class _ParticipantsSidebar extends StatelessWidget {
                   child: Row(
                     children: [
                       Container(
-                        width: 34, height: 34,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: _secondary),
+                        width: 34,
+                        height: 34,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _secondary,
+                        ),
                         child: Center(
-                          child: Text(p.initials,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+                          child: Text(
+                            p.initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -720,16 +849,29 @@ class _ParticipantsSidebar extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(p.name,
-                                style: const TextStyle(color: _primary, fontSize: 11, fontWeight: FontWeight.w500),
-                                overflow: TextOverflow.ellipsis),
-                            const Text('Connected', style: TextStyle(color: _secondary, fontSize: 9)),
+                            Text(
+                              p.name,
+                              style: const TextStyle(
+                                color: _primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const Text(
+                              'Connected',
+                              style: TextStyle(color: _secondary, fontSize: 9),
+                            ),
                           ],
                         ),
                       ),
                       Container(
-                        width: 6, height: 6,
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: _secondary),
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _secondary,
+                        ),
                       ),
                     ],
                   ),
@@ -789,11 +931,22 @@ class _ControlBar extends StatelessWidget {
           // Mode toggle pill
           Container(
             padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(color: _mutedLight, borderRadius: BorderRadius.circular(30)),
+            decoration: BoxDecoration(
+              color: _mutedLight,
+              borderRadius: BorderRadius.circular(30),
+            ),
             child: Row(
               children: [
-                _ModeBtn(label: 'Video', selected: isVideoMode, onTap: () => onSwitchMode(true)),
-                _ModeBtn(label: 'Voice', selected: !isVideoMode, onTap: () => onSwitchMode(false)),
+                _ModeBtn(
+                  label: 'Video',
+                  selected: isVideoMode,
+                  onTap: () => onSwitchMode(true),
+                ),
+                _ModeBtn(
+                  label: 'Voice',
+                  selected: !isVideoMode,
+                  onTap: () => onSwitchMode(false),
+                ),
               ],
             ),
           ),
@@ -806,7 +959,13 @@ class _ControlBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _error,
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: _error.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 3))],
+                boxShadow: [
+                  BoxShadow(
+                    color: _error.withOpacity(0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: const Icon(Icons.call_end, color: Colors.white, size: 24),
             ),
@@ -823,7 +982,12 @@ class _IconBtn extends StatelessWidget {
   final String tooltip;
   final VoidCallback onTap;
 
-  const _IconBtn({required this.icon, required this.active, required this.tooltip, required this.onTap});
+  const _IconBtn({
+    required this.icon,
+    required this.active,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -835,7 +999,10 @@ class _IconBtn extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.12)),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.12),
+          ),
           child: Icon(icon, color: color, size: 24),
         ),
       ),
@@ -848,7 +1015,11 @@ class _ModeBtn extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _ModeBtn({required this.label, required this.selected, required this.onTap});
+  const _ModeBtn({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

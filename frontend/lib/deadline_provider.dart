@@ -33,13 +33,12 @@ class DeadlineProvider extends ChangeNotifier {
   }
 
   // ── Read email saved by AuthService ──────────────────────────────────────
-  String get _userEmail =>
-      html.window.localStorage['lb_user_email'] ?? '';
+  String get _userEmail => html.window.localStorage['lb_user_email'] ?? '';
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'x-user-email': _userEmail,
-      };
+    'Content-Type': 'application/json',
+    'x-user-email': _userEmail,
+  };
 
   // ── PUBLIC: call this after login to reload deadlines ─────────────────────
   Future<void> loadFromServer() async {
@@ -56,21 +55,22 @@ class DeadlineProvider extends ChangeNotifier {
     debugPrint('=== Fetching deadlines for: $_userEmail');
 
     try {
-      final res = await http.get(
-        Uri.parse('$_base/'),
-        headers: _headers,
-      );
+      final res = await http.get(Uri.parse('$_base/'), headers: _headers);
       debugPrint('=== GET /deadlines status: ${res.statusCode}');
       debugPrint('=== Response: ${res.body}');
 
       if (res.statusCode == 200) {
         final List list = jsonDecode(res.body);
-        _deadlines = list.map((e) => Deadline(
-          id:     e['id'],
-          title:  e['title'],
-          date:   e['date'],
-          status: e['status'] ?? 'pending',
-        )).toList();
+        _deadlines = list
+            .map(
+              (e) => Deadline(
+                id: e['id'],
+                title: e['title'],
+                date: e['date'],
+                status: e['status'] ?? 'pending',
+              ),
+            )
+            .toList();
         debugPrint('=== Loaded ${_deadlines.length} deadlines ✅');
       }
     } catch (e) {
@@ -91,12 +91,14 @@ class DeadlineProvider extends ChangeNotifier {
       );
       if (res.statusCode == 201) {
         final e = jsonDecode(res.body);
-        _deadlines.add(Deadline(
-          id:     e['id'],
-          title:  e['title'],
-          date:   e['date'],
-          status: e['status'] ?? 'pending',
-        ));
+        _deadlines.add(
+          Deadline(
+            id: e['id'],
+            title: e['title'],
+            date: e['date'],
+            status: e['status'] ?? 'pending',
+          ),
+        );
         notifyListeners();
       }
     } catch (e) {
@@ -126,10 +128,7 @@ class DeadlineProvider extends ChangeNotifier {
     _deadlines.removeWhere((d) => d.id == id);
     notifyListeners();
     try {
-      await http.delete(
-        Uri.parse('$_base/$id'),
-        headers: _headers,
-      );
+      await http.delete(Uri.parse('$_base/$id'), headers: _headers);
     } catch (e) {
       debugPrint('=== DELETE ERROR: $e');
     }

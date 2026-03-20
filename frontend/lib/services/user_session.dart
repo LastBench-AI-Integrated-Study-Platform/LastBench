@@ -7,9 +7,9 @@ class UserSession {
   factory UserSession() => _i;
   UserSession._();
 
-  String userId   = '';
+  String userId = '';
   String username = '';
-  String name     = '';
+  String name = '';
   String initials = '';
 
   void set({
@@ -17,17 +17,22 @@ class UserSession {
     required String username,
     required String name,
   }) {
-    this.userId   = userId;
+    this.userId = userId;
     this.username = username;
-    this.name     = name;
-    final parts   = name.trim().split(' ');
+    this.name = name;
+    final parts = name.trim().split(' ');
     initials = parts.length >= 2
         ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
-        : name.isNotEmpty ? name[0].toUpperCase() : '?';
+        : name.isNotEmpty
+        ? name[0].toUpperCase()
+        : '?';
   }
 
   void clear() {
-    userId = ''; username = ''; name = ''; initials = '';
+    userId = '';
+    username = '';
+    name = '';
+    initials = '';
   }
 
   bool get isLoggedIn => userId.isNotEmpty;

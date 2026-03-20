@@ -10,8 +10,8 @@ const _teal = Color(0xFF379392);
 
 class OutgoingCallPage extends StatefulWidget {
   final UserModel receiver;
-  final String    channel;
-  final String    callType;
+  final String channel;
+  final String callType;
 
   const OutgoingCallPage({
     super.key,
@@ -26,10 +26,10 @@ class OutgoingCallPage extends StatefulWidget {
 
 class _OutgoingCallPageState extends State<OutgoingCallPage>
     with SingleTickerProviderStateMixin {
-  String  _status = 'Calling...';
+  String _status = 'Calling...';
   String? _logId;
   late AnimationController _pulse;
-  Timer?  _timeout;
+  Timer? _timeout;
 
   @override
   void initState() {
@@ -61,15 +61,18 @@ class _OutgoingCallPageState extends State<OutgoingCallPage>
   void _joinCall() {
     _timeout?.cancel();
     SocketService().offAll();
-    Navigator.pushReplacement(context, MaterialPageRoute(
-      builder: (_) => RealCallPage(
-        channel:      widget.channel,
-        callType:     widget.callType,
-        remoteUser:   widget.receiver,
-        isCallerSide: true,
-        logId:        _logId ?? '',
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RealCallPage(
+          channel: widget.channel,
+          callType: widget.callType,
+          remoteUser: widget.receiver,
+          isCallerSide: true,
+          logId: _logId ?? '',
+        ),
       ),
-    ));
+    );
   }
 
   void _cancel(String reason) {
@@ -89,7 +92,10 @@ class _OutgoingCallPageState extends State<OutgoingCallPage>
         content: Text(msg),
         actions: [
           TextButton(
-            onPressed: () { Navigator.pop(context); Navigator.pop(context); },
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
             child: const Text('OK'),
           ),
         ],
@@ -116,7 +122,7 @@ class _OutgoingCallPageState extends State<OutgoingCallPage>
             AnimatedBuilder(
               animation: _pulse,
               builder: (_, __) => Container(
-                width:  130 + 30 * _pulse.value,
+                width: 130 + 30 * _pulse.value,
                 height: 130 + 30 * _pulse.value,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -129,45 +135,79 @@ class _OutgoingCallPageState extends State<OutgoingCallPage>
             CircleAvatar(
               radius: 56,
               backgroundColor: _teal,
-              child: Text(widget.receiver.initials,
-                  style: const TextStyle(color: Colors.white, fontSize: 30,
-                      fontWeight: FontWeight.bold)),
+              child: Text(
+                widget.receiver.initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             const SizedBox(height: 24),
-            Text(widget.receiver.name,
-                style: const TextStyle(color: Colors.white, fontSize: 24,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              widget.receiver.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text('@${widget.receiver.username}',
-                style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 14)),
+            Text(
+              '@${widget.receiver.username}',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.55),
+                fontSize: 14,
+              ),
+            ),
             const SizedBox(height: 12),
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(
-                widget.callType == 'video' ? Icons.videocam : Icons.call,
-                color: _teal, size: 16,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                widget.callType == 'video' ? 'Video call' : 'Audio call',
-                style: const TextStyle(color: _teal, fontSize: 14),
-              ),
-            ]),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  widget.callType == 'video' ? Icons.videocam : Icons.call,
+                  color: _teal,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  widget.callType == 'video' ? 'Video call' : 'Audio call',
+                  style: const TextStyle(color: _teal, fontSize: 14),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
-            Text(_status,
-                style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13)),
+            Text(
+              _status,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.45),
+                fontSize: 13,
+              ),
+            ),
             const SizedBox(height: 64),
             // Cancel button
             GestureDetector(
               onTap: () => _cancel('Cancelled'),
               child: Container(
-                width: 68, height: 68,
+                width: 68,
+                height: 68,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444), shape: BoxShape.circle),
-                child: const Icon(Icons.call_end, color: Colors.white, size: 30),
+                  color: Color(0xFFEF4444),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.call_end,
+                  color: Colors.white,
+                  size: 30,
+                ),
               ),
             ),
             const SizedBox(height: 10),
-            const Text('Cancel', style: TextStyle(color: Colors.white60, fontSize: 13)),
+            const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white60, fontSize: 13),
+            ),
           ],
         ),
       ),

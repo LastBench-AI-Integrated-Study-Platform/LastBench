@@ -52,19 +52,25 @@ class _IncomingCallPageState extends State<IncomingCallPage>
     SocketService().offAll();
 
     final caller = UserModel(
-      id: widget.callerId, username: widget.callerName,
-      name: widget.callerName, avatar: '', isOnline: true,
+      id: widget.callerId,
+      username: widget.callerName,
+      name: widget.callerName,
+      avatar: '',
+      isOnline: true,
     );
 
-    Navigator.pushReplacement(context, MaterialPageRoute(
-      builder: (_) => RealCallPage(
-        channel:      widget.channel,
-        callType:     widget.callType,
-        remoteUser:   caller,
-        isCallerSide: false,
-        logId:        widget.logId,
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RealCallPage(
+          channel: widget.channel,
+          callType: widget.callType,
+          remoteUser: caller,
+          isCallerSide: false,
+          logId: widget.logId,
+        ),
       ),
-    ));
+    );
   }
 
   void _reject() {
@@ -88,8 +94,13 @@ class _IncomingCallPageState extends State<IncomingCallPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              widget.callType == 'video' ? 'Incoming Video Call' : 'Incoming Audio Call',
-              style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 16),
+              widget.callType == 'video'
+                  ? 'Incoming Video Call'
+                  : 'Incoming Audio Call',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.65),
+                fontSize: 16,
+              ),
             ),
             const SizedBox(height: 32),
             // Pulse + avatar
@@ -99,7 +110,7 @@ class _IncomingCallPageState extends State<IncomingCallPage>
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    width:  140 + 28 * _pulse.value,
+                    width: 140 + 28 * _pulse.value,
                     height: 140 + 28 * _pulse.value,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -112,15 +123,25 @@ class _IncomingCallPageState extends State<IncomingCallPage>
               child: CircleAvatar(
                 radius: 62,
                 backgroundColor: _teal,
-                child: Text(widget.callerInitials,
-                    style: const TextStyle(color: Colors.white, fontSize: 34,
-                        fontWeight: FontWeight.bold)),
+                child: Text(
+                  widget.callerInitials,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 28),
-            Text(widget.callerName,
-                style: const TextStyle(color: Colors.white, fontSize: 26,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              widget.callerName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 80),
             // Buttons
             Row(
@@ -133,7 +154,9 @@ class _IncomingCallPageState extends State<IncomingCallPage>
                   onTap: _reject,
                 ),
                 _CallBtn(
-                  icon: widget.callType == 'video' ? Icons.videocam : Icons.call,
+                  icon: widget.callType == 'video'
+                      ? Icons.videocam
+                      : Icons.call,
                   color: const Color(0xFF22C55E),
                   label: 'Accept',
                   onTap: _accept,
@@ -148,13 +171,17 @@ class _IncomingCallPageState extends State<IncomingCallPage>
 }
 
 class _CallBtn extends StatelessWidget {
-  final IconData   icon;
-  final Color      color;
-  final String     label;
+  final IconData icon;
+  final Color color;
+  final String label;
   final VoidCallback onTap;
 
-  const _CallBtn({required this.icon, required this.color,
-      required this.label, required this.onTap});
+  const _CallBtn({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -163,13 +190,17 @@ class _CallBtn extends StatelessWidget {
         GestureDetector(
           onTap: onTap,
           child: Container(
-            width: 70, height: 70,
+            width: 70,
+            height: 70,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             child: Icon(icon, color: Colors.white, size: 30),
           ),
         ),
         const SizedBox(height: 10),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
       ],
     );
   }

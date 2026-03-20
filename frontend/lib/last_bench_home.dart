@@ -3,7 +3,7 @@ import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
-
+import 'pages/call_contacts_page.dart';
 
 class LastBenchHome extends StatefulWidget {
   const LastBenchHome({super.key});
@@ -13,13 +13,12 @@ class LastBenchHome extends StatefulWidget {
 }
 
 class _LastBenchHomeState extends State<LastBenchHome> {
- 
   // Colors
   static const Color navy = Color(0xFF033F63);
   static const Color teal = Color(0xFF379392);
 
   // Facts
-  
+
   // Quick actions
   final List<Map<String, dynamic>> quickActions = [
     {
@@ -53,12 +52,11 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       "color": teal,
     },
     {
-  "icon": Icons.schedule,
-  "title": "Deadline Tracker",
-  "subtitle": "Track tasks & exams",
-  "color": teal,
-},
-
+      "icon": Icons.schedule,
+      "title": "Deadline Tracker",
+      "subtitle": "Track tasks & exams",
+      "color": teal,
+    },
   ];
 
   // Study rooms
@@ -169,32 +167,37 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () {
-  if (action["title"] == "Ask from PDF") {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => UploadScreen(),
-      ),
-    );
-  } 
-  else if (action["title"] == "Quiz cards + Flashcards") {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const UploadFileScreen(),
-      ),
-    );
-  } 
-  else if (action["title"] == "Deadline Tracker") {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const DeadlineTrackerPage(),
-      ),
-    );
-  }
-},
-
+                        if (action["title"] == "Ask from PDF") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UploadScreen(),
+                            ),
+                          );
+                        } else if (action["title"] ==
+                            "Quiz cards + Flashcards") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const UploadFileScreen(),
+                            ),
+                          );
+                        } else if (action["title"] == "Deadline Tracker") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DeadlineTrackerPage(),
+                            ),
+                          );
+                        } else if (action["title"] == "Join Study Call") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CallContactsPage(),
+                            ),
+                          );
+                        }
+                      },
 
                       child: Card(
                         shape: RoundedRectangleBorder(
@@ -242,11 +245,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
             ),
 
             // Daily Insights (Dynamic)
-const Padding(
-  padding: EdgeInsets.symmetric(horizontal: 16),
-  child: DailyInsightsCard(),
-),
-
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: DailyInsightsCard(),
+            ),
 
             // Study Rooms Header
             Padding(
