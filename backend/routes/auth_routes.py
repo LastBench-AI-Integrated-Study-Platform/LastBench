@@ -222,3 +222,21 @@ def reset_password(req: ResetPasswordRequest):
 
     return {"message": "Password reset successful"}
 
+
+class DirectResetRequest(BaseModel):
+    email: str
+    new_password: str
+
+@router.post("/reset_password/direct")
+def direct_reset_password(req: DirectResetRequest):
+    """Directly reset password without OTP verification (per user request)."""
+    email = req.email.lower()
+    
+    user = db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    db.users.update_one({"email": email}, {"$set": {"password": hash_password(req.new_password)}})
+    
+    return {"message": "Password updated successfully"}
+

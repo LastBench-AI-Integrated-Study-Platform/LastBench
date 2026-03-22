@@ -20,6 +20,7 @@ from sentence_transformers import SentenceTransformer
 
 from routes.auth_routes import router as auth_router
 from routes.insights_routes import router as insights_router
+from routes.chat_routes import router as chat_router
 from routes import combined_routes   # ✅ if you want /api routes
 
 # ================= CONFIG =================
@@ -40,6 +41,7 @@ app.add_middleware(
 # ✅ Include routers (ONLY ONCE)
 app.include_router(auth_router)
 app.include_router(insights_router)
+app.include_router(chat_router)
 app.include_router(combined_routes.router, prefix="/api")
 
 # ================= GROQ + EMBEDDINGS =================

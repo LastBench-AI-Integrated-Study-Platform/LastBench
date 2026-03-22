@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'last_bench_home.dart';
+import 'forgot_password_flow.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,7 +13,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -22,9 +21,12 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
   String? error;
 
-  // Brand colors
-  static const Color navy = Color(0xFF033F63);
-  static const Color teal = Color(0xFF379392);
+  // 🎨 Exact design colors
+  static const Color navy = Color(0xFF0F2E3C);
+  static const Color teal = Color(0xFF3A8D86);
+  static const Color hintGrey = Color(0xFF9FB0B7);
+  static const Color borderGrey = Color(0xFFE6ECEF);
+  static const Color fieldBg = Color(0xFFFBFDFE);
 
   void submitLogin() async {
     if (!_formKey.currentState!.validate()) return;
@@ -35,101 +37,109 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final res = await AuthService.login(
+      await AuthService.login(
         email: emailController.text,
         password: passwordController.text,
       );
 
-      // 👇 login success - extract user object and persist minimal info
-      final user = res['user'] as Map<String, dynamic>?;
-      final userName = user?['name'] as String? ?? 'Dude';
-      final userEmail = user?['email'] as String?;
-
-      // Persist email and name locally using SharedPreferences
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        if (userEmail != null) await prefs.setString('user_email', userEmail);
-        await prefs.setString('user_name', userName);
-      } catch (_) {}
+      if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => LastBenchHome(userName: userName)),
+        MaterialPageRoute(
+          builder: (_) => const LastBenchHome(),
+        ),
       );
     } catch (e) {
-      setState(() => error = e.toString());
+      if (!mounted) return;
+      setState(() {
+        error = "Invalid email or password";
+      });
     }
 
+    if (!mounted) return;
     setState(() => isLoading = false);
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Back button
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/signup');
-                  },
-                  child: const Text(
-                    "New to Last Bench? Create an account",
-                    style: TextStyle(color: teal),
-                  ),
-                ),
+                const SizedBox(height: 30),
 
-                const SizedBox(height: 20),
-
-                // Header
-                Center(
-                  child: Column(
-                    children: const [
-                      Text(
-                        "Welcome to Last Bench",
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: navy,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        "Sign in to continue your study journey",
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                    ],
+                // 🔙 Back button
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_ios, size: 16),
+                    label: const Text("Back"),
+                    style: TextButton.styleFrom(
+                      foregroundColor: navy,
+                    ),
                   ),
                 ),
 
                 const SizedBox(height: 30),
 
-                // 🔹 LOGIN CARD (WIDTH REDUCED)
+                // 🔹 Heading
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: navy,
+                      letterSpacing: -0.6,
+                    ),
+                    children: [
+                      TextSpan(text: "Welcome to "),
+                      TextSpan(
+                        text: "Last Bench",
+                        style: TextStyle(
+                          color: teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                const Text(
+                  "Sign in to continue your study journey",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    color: hintGrey,
+                  ),
+                ),
+
+                const SizedBox(height: 36),
+
+                // 🔹 Login Card
                 Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: 420, // 👈 adjust (380–450)
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 420),
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.grey.shade200),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                          ),
-                        ],
+                        border: Border.all(color: borderGrey),
                       ),
                       child: Form(
                         key: _formKey,
@@ -146,7 +156,10 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 child: Text(
                                   error!,
-                                  style: const TextStyle(color: Colors.red),
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
 
@@ -154,7 +167,8 @@ class _LoginPageState extends State<LoginPage> {
                             const Text(
                               "Email Address",
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
                                 color: navy,
                               ),
                             ),
@@ -163,20 +177,43 @@ class _LoginPageState extends State<LoginPage> {
                               controller: emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.mail, color: navy),
                                 hintText: "yourname@example.com",
+                                hintStyle: const TextStyle(
+                                  fontSize: 14,
+                                  color: hintGrey,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.mail_outline,
+                                  color: hintGrey,
+                                  size: 20,
+                                ),
                                 filled: true,
-                                fillColor: Colors.grey.shade100,
+                                fillColor: fieldBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
+                                  borderSide:
+                                      const BorderSide(color: borderGrey),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide:
+                                      const BorderSide(color: borderGrey),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide:
+                                      const BorderSide(color: teal),
                                 ),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return "Email is required";
                                 }
-                                if (!value.contains("@")) {
+                                if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
+                                    .hasMatch(value)) {
                                   return "Enter a valid email";
                                 }
                                 return null;
@@ -189,7 +226,8 @@ class _LoginPageState extends State<LoginPage> {
                             const Text(
                               "Password",
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
                                 color: navy,
                               ),
                             ),
@@ -198,13 +236,23 @@ class _LoginPageState extends State<LoginPage> {
                               controller: passwordController,
                               obscureText: !showPassword,
                               decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.lock, color: navy),
+                                hintText: "Enter your password",
+                                hintStyle: const TextStyle(
+                                  fontSize: 14,
+                                  color: hintGrey,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.lock_outline,
+                                  color: hintGrey,
+                                  size: 20,
+                                ),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     showPassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: navy,
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: hintGrey,
+                                    size: 20,
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -212,12 +260,22 @@ class _LoginPageState extends State<LoginPage> {
                                     });
                                   },
                                 ),
-                                hintText: "Enter your password",
                                 filled: true,
-                                fillColor: Colors.grey.shade100,
+                                fillColor: fieldBg,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
+                                  borderSide:
+                                      const BorderSide(color: borderGrey),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide:
+                                      const BorderSide(color: borderGrey),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide:
+                                      const BorderSide(color: teal),
                                 ),
                               ),
                               validator: (value) {
@@ -228,105 +286,74 @@ class _LoginPageState extends State<LoginPage> {
                               },
                             ),
 
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
 
-                            // Remember + Forgot
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Checkbox(
-                                      value: rememberMe,
-                                      activeColor: teal,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          rememberMe = value ?? false;
-                                        });
-                                      },
+                            // Forgot Password Link
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ForgotPasswordFlow(
+                                        onBack: () => Navigator.pop(context),
+                                        prefilledEmail: emailController.text.isNotEmpty ? emailController.text : null,
+                                      ),
                                     ),
-                                    const Text("Remember me"),
-                                  ],
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(50, 30),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
-                                TextButton(
-                                  onPressed: () {},
-                                  child: const Text(
-                                    "Forgot password?",
-                                    style: TextStyle(color: teal),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            // Login Button
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: teal,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: isLoading ? null : submitLogin,
-                                child: Text(
-                                  isLoading ? "Signing in..." : "Sign In",
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                child: const Text(
+                                  "Forgot Password?",
+                                  style: TextStyle(
+                                    color: teal,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
                             ),
 
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 14),
 
-                            // Divider
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Divider(color: Colors.grey.shade300),
-                                ),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text(
-                                    "Or continue with",
-                                    style: TextStyle(color: Colors.black54),
+                            // Sign In Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: teal,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(14),
                                   ),
                                 ),
-                                Expanded(
-                                  child: Divider(color: Colors.grey.shade300),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            // Social buttons
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {},
-                                    icon: const Icon(
-                                      Icons.g_mobiledata,
-                                      color: navy,
-                                    ),
-                                    label: const Text("Google"),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {},
-                                    icon: const Icon(Icons.code, color: navy),
-                                    label: const Text("GitHub"),
-                                  ),
-                                ),
-                              ],
+                                onPressed:
+                                    isLoading ? null : submitLogin,
+                                child: isLoading
+                                    ? const SizedBox(
+                                        height: 22,
+                                        width: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        "Sign In",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                              ),
                             ),
                           ],
                         ),
@@ -335,32 +362,35 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: 28),
 
                 // Signup
-                Center(
-                  child: TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      "New to Last Bench? Create an account",
-                      style: TextStyle(color: teal),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                const Center(
-                  child: Text(
-                    "\"Back benchers welcome. Top ranks guaranteed.\"",
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/signup');
+                  },
+                  child: const Text(
+                    "New to Last Bench? Create an account",
                     style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: Colors.black45,
+                      fontSize: 14,
+                      color: teal,
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: 12),
+
+                const Text(
+                  "\"Back benchers welcome. Top ranks guaranteed.\"",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: hintGrey,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 40),
               ],
             ),
           ),

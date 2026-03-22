@@ -5,7 +5,7 @@
 // ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:html' as html;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 // ─── Colour Palette ───────────────────────────────────────────────────────────
@@ -22,42 +22,21 @@ const Color kBorder = Color(0xFFDCE8E8);
 const Color kAccent = Color(0xFF2E8888);
 const double kRadius = 10.0;
 
-// ─── Web image picker (dart:html, no package) ─────────────────────────────────
+// ─── Image picker ─────────────────────────────────────────────────────────────
 Future<Uint8List?> pickImageFromWeb() async {
-  final completer = Completer<Uint8List?>();
+  try {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
 
-  final input = html.FileUploadInputElement()
-    ..accept = 'image/*'
-    ..click();
-
-  input.onChange.listen((event) {
-    final file = input.files?.first;
-    if (file == null) {
-      completer.complete(null);
-      return;
+    if (result != null && result.files.isNotEmpty) {
+      return result.files.first.bytes;
     }
-    final reader = html.FileReader();
-    reader.readAsArrayBuffer(file);
-    reader.onLoadEnd.listen((_) {
-      final result = reader.result;
-      // depending on browser / dart2js output we may get either a
-      // ByteBuffer or a plain Uint8List. earlier code only handled
-      // ByteBuffer which meant the picker would silently return null
-      // even though a valid image was chosen.
-      if (result is ByteBuffer) {
-        completer.complete(result.asUint8List());
-      } else if (result is Uint8List) {
-        completer.complete(result);
-      } else {
-        completer.complete(null);
-      }
-    });
-  });
-
-  // If user closes dialog without picking
-  input.onAbort.listen((_) => completer.complete(null));
-
-  return completer.future;
+  } catch (e) {
+    debugPrint('Error picking image: $e');
+  }
+  return null;
 }
 
 // ─── Data Models ─────────────────────────────────────────────────────────────

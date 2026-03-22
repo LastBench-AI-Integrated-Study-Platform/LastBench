@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  static const String baseUrl = "http://127.0.0.1:8000";
+  static const String baseUrl = "http://192.168.0.7:8000";
+  static String? currentUserEmail;
 
   static Future<String> signup({
     required String name,
@@ -42,6 +43,9 @@ class AuthService {
     if (res.statusCode != 200) {
       throw data["detail"];
     }
+    
+    currentUserEmail = email; // Store the email for other services
+    
     return data;
   }
 
@@ -99,6 +103,27 @@ class AuthService {
     final data = jsonDecode(res.body);
     if (res.statusCode != 200) {
       throw data["detail"] ?? "Password reset failed";
+    }
+    return data["message"] as String;
+  }
+
+  /// Reset password directly without OTP.
+  static Future<String> resetPasswordDirectly({
+    required String email,
+    required String newPassword,
+  }) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/auth/reset_password/direct"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "email": email,
+        "new_password": newPassword,
+      }),
+    );
+
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      throw data["detail"] ?? "Password update failed";
     }
     return data["message"] as String;
   }

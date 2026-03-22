@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'otp_page.dart';
 import 'reset_password_page.dart';
 
 class ForgotPasswordFlow extends StatefulWidget {
@@ -17,34 +16,12 @@ class ForgotPasswordFlow extends StatefulWidget {
 }
 
 class _ForgotPasswordFlowState extends State<ForgotPasswordFlow> {
-  bool showResetPage = false;
-  String? _email;
-  String? _otp;
-
-  void goToReset(String email, String otp) {
-    setState(() {
-      _email = email;
-      _otp = otp;
-      showResetPage = true;
-    });
-  }
-
-  void goBackToOTP() {
-    setState(() {
-      showResetPage = false;
-      _email = null;
-      _otp = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return showResetPage
-        ? ResetPasswordPage(
-            onBack: goBackToOTP,
-            initialEmail: _email,
-            initialOtp: _otp,
-          )
-        : OTPPage(onNext: goToReset, onBack: widget.onBack);
+    // Skip OTP and go straight to the Reset Password Page
+    return ResetPasswordPage(
+      onBack: widget.onBack,
+      initialEmail: widget.prefilledEmail,
+    );
   }
 }

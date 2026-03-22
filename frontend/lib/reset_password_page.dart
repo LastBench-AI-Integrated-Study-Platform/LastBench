@@ -4,13 +4,11 @@ import 'services/auth_service.dart';
 class ResetPasswordPage extends StatefulWidget {
   final VoidCallback onBack;
   final String? initialEmail;
-  final String? initialOtp;
 
   const ResetPasswordPage({
     super.key,
     required this.onBack,
     this.initialEmail,
-    this.initialOtp,
   });
 
   @override
@@ -21,7 +19,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   final _formKey = GlobalKey<FormState>();
 
   final usernameController = TextEditingController();
-  final otpController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmController = TextEditingController();
 
@@ -37,9 +34,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialEmail != null)
+    if (widget.initialEmail != null) {
       usernameController.text = widget.initialEmail!;
-    if (widget.initialOtp != null) otpController.text = widget.initialOtp!;
+    }
   }
 
   @override
@@ -107,15 +104,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
                       const SizedBox(height: 20),
 
-                      _label("OTP"),
-                      _inputField(
-                        controller: otpController,
-                        icon: Icons.shield,
-                        hint: "Enter OTP sent to email",
-                      ),
-
-                      const SizedBox(height: 20),
-
                       /// New Password
                       _label("New Password"),
                       _inputField(
@@ -168,22 +156,15 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                           onPressed: isSubmitting
                               ? null
                               : () async {
-                                  if (!_formKey.currentState!.validate())
+                                  if (!_formKey.currentState!.validate()) {
                                     return;
+                                  }
                                   final email = usernameController.text.trim();
-                                  final otp = otpController.text.trim();
                                   final pw = passwordController.text.trim();
                                   final conf = confirmController.text.trim();
                                   if (pw != conf) {
                                     setState(() {
                                       message = 'Passwords do not match';
-                                    });
-                                    return;
-                                  }
-
-                                  if (otp.isEmpty) {
-                                    setState(() {
-                                      message = 'OTP is required';
                                     });
                                     return;
                                   }
@@ -194,18 +175,19 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                   });
 
                                   try {
-                                    await AuthService.resetPasswordWithOtp(
+                                    await AuthService.resetPasswordDirectly(
                                       email: email,
-                                      otp: otp,
                                       newPassword: pw,
                                     );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Password reset successful',
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Password reset successful',
+                                          ),
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    }
                                     widget.onBack();
                                   } catch (e) {
                                     setState(() {
