@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 class ChatService {
-  static const String baseUrl = "http://192.168.0.7:8000";
+  static const String baseUrl = "http://192.168.0.6:8000";
 
   static Future<List<Map<String, dynamic>>> getGroups() async {
     final email = AuthService.currentUserEmail;

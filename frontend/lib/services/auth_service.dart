@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  static const String baseUrl = "http://192.168.0.7:8000";
+  static const String baseUrl = "http://192.168.0.6:8000";
   static String? currentUserEmail;
 
   static Future<String> signup({
