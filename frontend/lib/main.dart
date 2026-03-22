@@ -16,6 +16,7 @@ class LastBenchApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< Updated upstream
     return ChangeNotifierProvider(
       create: (_) => DeadlineProvider(),
       child: MaterialApp(
@@ -30,6 +31,22 @@ class LastBenchApp extends StatelessWidget {
           '/deadline': (context) => const DeadlineTrackerPage(),
         },
       ),
+=======
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Last Bench',
+      theme: ThemeData(primaryColor: const Color(0xFF033F63)),
+
+      // 👇 First screen
+      initialRoute: '/login',
+
+      routes: {
+        '/home': (context) => const LastBenchHome(),
+        '/login': (context) => const LoginPage(),
+        '/signup': (context) => const SignupPage(),
+        '/landing': (context) => const LandingPage(),
+      },
+>>>>>>> Stashed changes
     );
   }
 }

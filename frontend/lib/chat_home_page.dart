@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/chat_service.dart';
 
 class ChatHomePage extends StatefulWidget {
   const ChatHomePage({Key? key}) : super(key: key);
@@ -9,6 +10,7 @@ class ChatHomePage extends StatefulWidget {
 
 class _ChatHomePageState extends State<ChatHomePage> {
   bool isGroupsSelected = true;
+  bool isLoading = true;
 
   final TextEditingController searchController = TextEditingController();
   String searchQuery = "";
@@ -17,29 +19,38 @@ class _ChatHomePageState extends State<ChatHomePage> {
   final Color teal = const Color(0xFF3F8F8B);
   final Color bgColor = const Color(0xFFF5F6F7);
 
-  final List<Map<String, dynamic>> groups = [
-    {"initials": "DT", "name": "Design Team", "active": 8},
-    {"initials": "PN", "name": "Project Nexus", "active": 5},
-    {"initials": "MS", "name": "Marketing Sync", "active": 12},
-  ];
+  List<Map<String, dynamic>> groups = [];
+  List<Map<String, dynamic>> personalChats = [];
 
-  final List<Map<String, dynamic>> personalChats = [
-    {
-      "name": "Arjun",
-      "message": "Did you complete the task?",
-      "time": "9:30 AM"
-    },
-    {
-      "name": "Meera",
-      "message": "Let's meet after class",
-      "time": "Yesterday"
-    },
-    {
-      "name": "Kavin",
-      "message": "Send the notes pls",
-      "time": "Mon"
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final fetchedGroups = await ChatService.getGroups();
+      final fetchedChats = await ChatService.getPersonalChats();
+
+      setState(() {
+        groups = fetchedGroups;
+        personalChats = fetchedChats;
+      });
+    } catch (e) {
+      print("Error fetching chat data: $e");
+    } finally {
+      if(mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
 
   int getTotalActive() {
     return groups.fold(0, (sum, item) => sum + (item["active"] as int));
@@ -106,11 +117,13 @@ class _ChatHomePageState extends State<ChatHomePage> {
               const SizedBox(height: 25),
 
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child:
-                      isGroupsSelected ? _buildGroupsGrid() : _buildPersonalList(),
-                ),
+                child: isLoading 
+                  ? const Center(child: CircularProgressIndicator())
+                  : AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child:
+                          isGroupsSelected ? _buildGroupsGrid() : _buildPersonalList(),
+                    ),
               ),
             ],
           ),

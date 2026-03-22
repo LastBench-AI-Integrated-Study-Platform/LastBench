@@ -27,6 +27,7 @@ from routes import combined_routes
 from routes.deadline_routes import router as deadline_router
 from routes.call_routes import router as call_router
 from socket_manager import sio
+from routes.chat_routes import router as chat_router
 
 # ================= CONFIG =================
 load_dotenv()
@@ -46,6 +47,7 @@ app.add_middleware(
 # ✅ Include routers
 app.include_router(auth_router)
 app.include_router(insights_router)
+app.include_router(chat_router, prefix="/api")
 app.include_router(doubt_router)
 app.include_router(combined_routes.router, prefix="/api")
 

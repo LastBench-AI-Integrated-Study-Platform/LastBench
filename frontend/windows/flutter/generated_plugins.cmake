@@ -3,10 +3,14 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+<<<<<<< Updated upstream
   agora_rtc_engine
   file_selector_windows
   iris_method_channel
   permission_handler_windows
+=======
+  file_selector_windows
+>>>>>>> Stashed changes
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
