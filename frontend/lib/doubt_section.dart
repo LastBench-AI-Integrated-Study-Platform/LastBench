@@ -1,12 +1,15 @@
 // doubts_section.dart
-// Uses dart:html FileUploadInputElement directly — zero packages needed, works on Flutter Web!
-// No pubspec.yaml changes required.
+// Full backend integration with MongoDB
+// Displays doubts from database and stores all operations
 
 // ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_service.dart';
+import 'services/doubt_api_service.dart';
 
 // ─── Colour Palette ───────────────────────────────────────────────────────────
 const Color kBackground = Color(0xFFF5FAFA);
@@ -22,21 +25,80 @@ const Color kBorder = Color(0xFFDCE8E8);
 const Color kAccent = Color(0xFF2E8888);
 const double kRadius = 10.0;
 
-// ─── Image picker ─────────────────────────────────────────────────────────────
-Future<Uint8List?> pickImageFromWeb() async {
-  try {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
+// ─── Web image picker (dart:html, no package) ─────────────────────────────────
+Future<List<Uint8List>> pickImagesFromWeb() async {
+  final completer = Completer<List<Uint8List>>();
 
-    if (result != null && result.files.isNotEmpty) {
-      return result.files.first.bytes;
+  final input = html.FileUploadInputElement()
+    ..accept = 'image/*'
+    ..multiple = true
+    ..click();
+
+  input.onChange.listen((event) async {
+    final files = input.files;
+    if (files == null || files.isEmpty) {
+      completer.complete([]);
+      return;
     }
-  } catch (e) {
-    debugPrint('Error picking image: $e');
+    
+    List<Uint8List> allBytes = [];
+    for (var file in files) {
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoadEnd.first;
+      final result = reader.result;
+      if (result is ByteBuffer) {
+        allBytes.add(result.asUint8List());
+      } else if (result is Uint8List) {
+        allBytes.add(result);
+      }
+    }
+    completer.complete(allBytes);
+  });
+
+  input.onAbort.listen((_) => completer.complete([]));
+
+  return completer.future;
+}
+
+// ─── User helpers ───────────────────────────────────────────────────────────
+Future<String> _loadUserName() async {
+  try {
+    return AuthService.getUserName() ?? 'You';
+  } catch (_) {
+    return 'You';
   }
-  return null;
+}
+
+String _avatarFromName(String name) {
+  if (name.trim().isEmpty) return '??';
+  final parts = name.trim().split(RegExp(r"\s+"));
+  if (parts.length == 1) {
+    return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+  }
+  final first = parts[0].isNotEmpty ? parts[0][0] : '';
+  final second = parts[1].isNotEmpty ? parts[1][0] : '';
+  return (first + second).toUpperCase();
+}
+
+// ─── Timestamp formatting helper ─────────────────────────────────────────────
+String formatTimestamp(String? iso) {
+  if (iso == null || iso.isEmpty) return 'Now';
+  try {
+    String normalized = iso;
+    final hasOffset =
+        iso.endsWith('Z') || iso.contains(RegExp(r'[+-]\d{2}:\d{2}'));
+    if (!hasOffset) normalized = iso + 'Z';
+
+    final dt = DateTime.parse(normalized).toLocal();
+    final dateStr = '${dt.day}/${dt.month}/${dt.year}';
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return 'date: $dateStr time: $hour12:$minute $ampm';
+  } catch (_) {
+    return iso;
+  }
 }
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
@@ -62,7 +124,7 @@ class Comment {
   final String authorAvatar;
   final String content;
   final String createdAt;
-  final List<Uint8List> imageBytes; // multiple user-uploaded images
+  final List<Uint8List> imageBytes;
   final List<Reply> replies;
   Comment({
     required this.id,
@@ -82,8 +144,8 @@ class Doubt {
   final String id;
   final String title;
   final String content;
-  final String? imageUrl; // network image (sample data)
-  final List<Uint8List> imageBytes; // multiple user-picked bytes via dart:html
+  final String? imageUrl;
+  final List<Uint8List> imageBytes;
   final String author;
   final String authorAvatar;
   final String subject;
@@ -178,9 +240,9 @@ String generateId() => (++_idCounter).toString();
 
 // ─── Helper: render image ─────────────────────────────────────────────────────
 
-Widget _buildDoubtImage(Doubt doubt, {double? height}) {
+Widget _buildDoubtImage(DoubtApiModel doubt, {double? height}) {
   final br = BorderRadius.circular(kRadius);
-  if (doubt.imageBytes.isNotEmpty) {
+  if (doubt.imageUrls != null && doubt.imageUrls!.isNotEmpty) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -189,31 +251,28 @@ Widget _buildDoubtImage(Doubt doubt, {double? height}) {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: doubt.imageBytes.length,
+      itemCount: doubt.imageUrls!.length,
       itemBuilder: (ctx, idx) => ClipRRect(
         borderRadius: br,
-        child: Image.memory(
-          doubt.imageBytes[idx],
+        child: Image.network(
+          'http://localhost:8000/${doubt.imageUrls![idx]}',
           height: height,
           width: double.infinity,
           fit: BoxFit.cover,
+          errorBuilder: (ctx, error, stackTrace) => Container(
+            color: kMuted,
+            child: const Icon(Icons.broken_image, color: kMutedForeground),
+          ),
         ),
-      ),
-    );
-  }
-  if (doubt.imageUrl != null) {
-    return ClipRRect(
-      borderRadius: br,
-      child: Image.network(
-        doubt.imageUrl!,
-        height: height,
-        width: double.infinity,
-        fit: BoxFit.cover,
       ),
     );
   }
   return const SizedBox.shrink();
 }
+
+// ─── Tab enum ────────────────────────────────────────────────────────────────
+
+enum _DoubtTab { personal, others }
 
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 
@@ -224,41 +283,190 @@ class DoubtsSection extends StatefulWidget {
 }
 
 class _DoubtsSectionState extends State<DoubtsSection> {
-  List<Doubt> _doubts = List.from(initialDoubts);
+  List<DoubtApiModel> _doubts = [];
+  bool _isLoading = true;
+  bool _isCreating = false;
+
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
+  // ── Toggle & Search state ──
+  _DoubtTab _activeTab = _DoubtTab.personal;
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDoubts();
+    _initializeUser();
+    _searchCtrl.addListener(() {
+      if (mounted) {
+        setState(() => _searchQuery = _searchCtrl.text.trim().toLowerCase());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
+  }
+
+  Future<void> _loadDoubts() async {
+    setState(() => _isLoading = true);
+    final doubts = await DoubtApiService.getAllDoubts();
+    if (mounted) {
+      setState(() {
+        _doubts = doubts ?? [];
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Returns doubts filtered by active tab and search query.
+  List<DoubtApiModel> get _filteredDoubts {
+    if (_doubts.isEmpty) return [];
+
+    final currentNameLower = (_currentUserName.isNotEmpty)
+        ? _currentUserName.toLowerCase()
+        : 'you';
+
+    List<DoubtApiModel> tabFiltered;
+
+    if (_activeTab == _DoubtTab.personal) {
+      tabFiltered = _doubts.where((d) {
+        final author = (d.author ?? '').toLowerCase().trim();
+        return author == currentNameLower || author == 'you';
+      }).toList();
+    } else {
+      tabFiltered = _doubts.where((d) {
+        final author = (d.author ?? '').toLowerCase().trim();
+        return author != currentNameLower && author != 'you';
+      }).toList();
+    }
+
+    final query = _searchQuery.trim();
+    if (query.isEmpty) return tabFiltered;
+
+    return tabFiltered.where((d) {
+      final title = (d.title ?? '').toLowerCase();
+      final content = (d.content ?? '').toLowerCase();
+      final subject = (d.subject ?? '').toLowerCase();
+      final author = (d.author ?? '').toLowerCase();
+      return title.contains(query) ||
+          content.contains(query) ||
+          subject.contains(query) ||
+          author.contains(query);
+    }).toList();
+  }
 
   void _openNewDoubtDialog() {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.4),
       builder: (ctx) => _NewDoubtDialog(
-        onSubmit: (doubt) => setState(() => _doubts.insert(0, doubt)),
+        onSubmit: (doubt) async {
+          setState(() => _isCreating = true);
+          await _loadDoubts();
+          setState(() => _isCreating = false);
+        },
       ),
     );
   }
 
-  void _openDoubtDetail(Doubt doubt) {
+  void _openDoubtDetail(DoubtApiModel doubt) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => _DoubtDetailPage(
           doubt: doubt,
           onUpdated: (updated) {
-            setState(() {
-              final i = _doubts.indexWhere((d) => d.id == updated.id);
-              if (i != -1) _doubts[i] = updated;
-            });
+            _loadDoubts();
           },
         ),
       ),
     );
   }
 
+  Future<void> _editDoubt(DoubtApiModel doubt) async {
+    final result = await showDialog<DoubtApiModel>(
+      context: context,
+      builder: (_) => _EditDoubtDialog(doubt: doubt),
+    );
+    if (result != null && mounted) {
+      _loadDoubts();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Doubt updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteDoubt(DoubtApiModel doubt) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Doubt'),
+        content: const Text(
+          'Are you sure you want to delete this doubt? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteDoubt(doubt.id ?? '');
+      if (success && mounted) {
+        _loadDoubts();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Doubt deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete doubt'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredDoubts;
+
     return Container(
       color: kBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header row ──
           Padding(
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
             child: Row(
@@ -296,27 +504,209 @@ class _DoubtsSectionState extends State<DoubtsSection> {
               ],
             ),
           ),
-          ...List.generate(_doubts.length, (i) {
-            final doubt = _doubts[i];
-            return Padding(
-              padding: EdgeInsets.only(bottom: i < _doubts.length - 1 ? 16 : 0),
-              child: _DoubtCard(
-                doubt: doubt,
-                onTap: () => _openDoubtDetail(doubt),
-              ),
-            );
-          }),
-          if (_doubts.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Text(
-                  'No doubts yet. Post the first one!',
-                  style: TextStyle(color: kMutedForeground, fontSize: 14),
+
+          // ── Toggle tabs ──
+          _ToggleTabs(
+            activeTab: _activeTab,
+            onTabChanged: (tab) => setState(() => _activeTab = tab),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Search bar ──
+          _SearchBar(controller: _searchCtrl),
+          const SizedBox(height: 16),
+
+          // ── Content ──
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator(color: kPrimary)),
+            )
+          else ...[
+            ...List.generate(filtered.length, (i) {
+              final doubt = filtered[i];
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: i < filtered.length - 1 ? 16 : 0,
+                ),
+                child: _DoubtCard(
+                  doubt: doubt,
+                  onTap: () => _openDoubtDetail(doubt),
+                  currentUserName: _currentUserName,
+                  currentUserAvatar: _currentUserAvatar,
+                  onEdit: () => _editDoubt(doubt),
+                  onDelete: () => _deleteDoubt(doubt),
+                ),
+              );
+            }),
+            if (filtered.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _searchQuery.isNotEmpty
+                            ? Icons.search_off
+                            : _activeTab == _DoubtTab.personal
+                            ? Icons.person_outline
+                            : Icons.group_outlined,
+                        size: 40,
+                        color: kMutedForeground,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _searchQuery.isNotEmpty
+                            ? 'No doubts match "$_searchQuery"'
+                            : _activeTab == _DoubtTab.personal
+                            ? 'You haven\'t posted any doubts yet.'
+                            : 'No doubts from others yet.',
+                        style: const TextStyle(
+                          color: kMutedForeground,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// ─── Toggle Tabs Widget ───────────────────────────────────────────────────────
+
+class _ToggleTabs extends StatelessWidget {
+  final _DoubtTab activeTab;
+  final void Function(_DoubtTab) onTabChanged;
+
+  const _ToggleTabs({required this.activeTab, required this.onTabChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFFECF0F0),
+        borderRadius: BorderRadius.circular(50),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _TabItem(
+            label: 'My Doubts',
+            icon: Icons.person_outline,
+            isActive: activeTab == _DoubtTab.personal,
+            onTap: () => onTabChanged(_DoubtTab.personal),
+          ),
+          _TabItem(
+            label: 'Others',
+            icon: Icons.group_outlined,
+            isActive: activeTab == _DoubtTab.others,
+            onTap: () => onTabChanged(_DoubtTab.others),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _TabItem({
+    required this.label,
+    required this.icon,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? kForeground : Colors.transparent,
+          borderRadius: BorderRadius.circular(50),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isActive ? Colors.white : kMutedForeground,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive ? Colors.white : kMutedForeground,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Search Bar Widget ────────────────────────────────────────────────────────
+
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  const _SearchBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(fontSize: 14, color: kForeground),
+      decoration: InputDecoration(
+        hintText: 'Search doubts by title, subject, or author...',
+        hintStyle: const TextStyle(fontSize: 13, color: kMutedForeground),
+        prefixIcon: const Icon(Icons.search, size: 20, color: kMutedForeground),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (_, value, __) => value.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close,
+                    size: 18,
+                    color: kMutedForeground,
+                  ),
+                  onPressed: () => controller.clear(),
+                )
+              : const SizedBox.shrink(),
+        ),
+        filled: true,
+        fillColor: kCard,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: kBorder, width: 1),
+          borderRadius: BorderRadius.circular(kRadius),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: kPrimary, width: 1.5),
+          borderRadius: BorderRadius.circular(kRadius),
+        ),
       ),
     );
   }
@@ -325,9 +715,20 @@ class _DoubtsSectionState extends State<DoubtsSection> {
 // ─── Doubt Card ───────────────────────────────────────────────────────────────
 
 class _DoubtCard extends StatelessWidget {
-  final Doubt doubt;
+  final DoubtApiModel doubt;
   final VoidCallback onTap;
-  const _DoubtCard({required this.doubt, required this.onTap});
+  final String currentUserName;
+  final String currentUserAvatar;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  const _DoubtCard({
+    required this.doubt,
+    required this.onTap,
+    required this.currentUserName,
+    required this.currentUserAvatar,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +751,12 @@ class _DoubtCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Avatar(initials: doubt.authorAvatar, size: 40),
+            _Avatar(
+              initials: (doubt.authorAvatar ?? '').toUpperCase() == 'YO'
+                  ? currentUserAvatar
+                  : (doubt.authorAvatar ?? '??'),
+              size: 40,
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -364,7 +770,7 @@ class _DoubtCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              doubt.title,
+                              doubt.title ?? '',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -373,7 +779,7 @@ class _DoubtCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${doubt.author} • ${doubt.createdAt}',
+                              '${(doubt.author ?? '').toLowerCase() == 'you' ? currentUserName : (doubt.author ?? '')} • ${formatTimestamp(doubt.createdAt)}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: kMutedForeground,
@@ -383,12 +789,48 @@ class _DoubtCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _Badge(label: doubt.subject),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _Badge(label: doubt.subject ?? ''),
+                          if (doubt.author == currentUserName &&
+                              (onEdit != null || onDelete != null)) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (onEdit != null)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      size: 16,
+                                      color: kMutedForeground,
+                                    ),
+                                    onPressed: onEdit,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                if (onDelete != null)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      size: 16,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: onDelete,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    doubt.content,
+                    doubt.content ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -397,7 +839,7 @@ class _DoubtCard extends StatelessWidget {
                       height: 1.4,
                     ),
                   ),
-                  if (doubt.hasImage) ...[
+                  if (doubt.hasImage == true) ...[
                     const SizedBox(height: 12),
                     _buildDoubtImage(doubt, height: 128),
                   ],
@@ -411,7 +853,7 @@ class _DoubtCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${doubt.comments.length} answers',
+                        '${(doubt.comments ?? []).length} answers',
                         style: const TextStyle(
                           fontSize: 13,
                           color: kMutedForeground,
@@ -432,7 +874,7 @@ class _DoubtCard extends StatelessWidget {
 // ─── New Doubt Dialog ─────────────────────────────────────────────────────────
 
 class _NewDoubtDialog extends StatefulWidget {
-  final void Function(Doubt) onSubmit;
+  final void Function(DoubtApiModel?) onSubmit;
   const _NewDoubtDialog({required this.onSubmit});
   @override
   State<_NewDoubtDialog> createState() => _NewDoubtDialogState();
@@ -445,13 +887,32 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
   List<Uint8List> _imageBytes = [];
   bool _isPickingImage = false;
 
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
+  }
+
   Future<void> _pickImage() async {
     if (_isPickingImage) return;
     setState(() => _isPickingImage = true);
     try {
-      final bytes = await pickImageFromWeb(); // ← uses dart:html directly
-      if (bytes != null && mounted) {
-        setState(() => _imageBytes.add(bytes));
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _imageBytes.addAll(bytesList));
       }
     } catch (e) {
       if (mounted) {
@@ -471,24 +932,79 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
     setState(() => _imageBytes.removeAt(index));
   }
 
-  void _submit() {
-    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty)
+  Future<void> _submit() async {
+    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill title and description')),
+      );
       return;
-    widget.onSubmit(
-      Doubt(
-        id: generateId(),
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      List<String> uploadedImageUrls = [];
+      if (_imageBytes.isNotEmpty) {
+        for (int i = 0; i < _imageBytes.length; i++) {
+          final url = await DoubtApiService.uploadImage(
+            _imageBytes[i],
+            'doubt_image_$i.jpg',
+          );
+          if (url != null) {
+            uploadedImageUrls.add(url);
+          }
+        }
+      }
+
+      final doubt = await DoubtApiService.createDoubt(
         title: _titleCtrl.text.trim(),
         content: _contentCtrl.text.trim(),
-        imageBytes: _imageBytes,
-        author: 'You',
-        authorAvatar: 'YO',
         subject: _subjectCtrl.text.trim().isEmpty
             ? 'General'
             : _subjectCtrl.text.trim(),
-        createdAt: 'Just now',
-      ),
-    );
-    Navigator.of(context).pop();
+        author: _currentUserName,
+        authorAvatar: _currentUserAvatar,
+        imageUrls: uploadedImageUrls,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (doubt != null) {
+        widget.onSubmit(doubt);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Doubt posted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create doubt'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   @override
@@ -686,18 +1202,361 @@ class _NewDoubtDialogState extends State<_NewDoubtDialog> {
   }
 }
 
-// ─── Doubt Detail Page ────────────────────────────────────────────────────────
+// ─── Edit Doubt Dialog ─────────────────────────────────────────────────────
+
+class _EditDoubtDialog extends StatefulWidget {
+  final DoubtApiModel doubt;
+  const _EditDoubtDialog({required this.doubt});
+  @override
+  State<_EditDoubtDialog> createState() => _EditDoubtDialogState();
+}
+
+class _EditDoubtDialogState extends State<_EditDoubtDialog> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _subjectCtrl;
+  late final TextEditingController _contentCtrl;
+  List<Uint8List> _imageBytes = [];
+  bool _isPickingImage = false;
+
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.doubt.title);
+    _subjectCtrl = TextEditingController(text: widget.doubt.subject);
+    _contentCtrl = TextEditingController(text: widget.doubt.content);
+    _initializeUser();
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _subjectCtrl.dispose();
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    if (_isPickingImage) return;
+    setState(() => _isPickingImage = true);
+    try {
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _imageBytes.addAll(bytesList));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not pick image: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false);
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() => _imageBytes.removeAt(index));
+  }
+
+  Future<void> _submit() async {
+    if (_titleCtrl.text.trim().isEmpty || _contentCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill title and description')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      List<String> uploadedImageUrls = List.from(widget.doubt.imageUrls ?? []);
+      if (_imageBytes.isNotEmpty) {
+        for (int i = 0; i < _imageBytes.length; i++) {
+          final url = await DoubtApiService.uploadImage(
+            _imageBytes[i],
+            'doubt_image_$i.jpg',
+          );
+          if (url != null) {
+            uploadedImageUrls.add(url);
+          }
+        }
+      }
+
+      final success = await DoubtApiService.updateDoubt(
+        widget.doubt.id ?? '',
+        title: _titleCtrl.text.trim(),
+        content: _contentCtrl.text.trim(),
+        subject: _subjectCtrl.text.trim().isEmpty
+            ? 'General'
+            : _subjectCtrl.text.trim(),
+        imageUrls: uploadedImageUrls,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        final updated = DoubtApiModel(
+          id: widget.doubt.id,
+          title: _titleCtrl.text.trim(),
+          content: _contentCtrl.text.trim(),
+          subject: _subjectCtrl.text.trim().isEmpty
+              ? 'General'
+              : _subjectCtrl.text.trim(),
+          author: widget.doubt.author,
+          authorAvatar: widget.doubt.authorAvatar,
+          imageUrls: uploadedImageUrls,
+          createdAt: widget.doubt.createdAt,
+          comments: widget.doubt.comments,
+        );
+        Navigator.of(context).pop(updated);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update doubt'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kRadius),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Doubt',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: kForeground,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const _FormLabel('Title'),
+            const SizedBox(height: 8),
+            _StyledInput(
+              controller: _titleCtrl,
+              hint: "What's your question about?",
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Subject'),
+            const SizedBox(height: 8),
+            _StyledInput(
+              controller: _subjectCtrl,
+              hint: 'e.g., Mathematics, Physics, DSA...',
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Description'),
+            const SizedBox(height: 8),
+            _StyledTextArea(
+              controller: _contentCtrl,
+              hint: 'Explain your doubt in detail...',
+              minLines: 4,
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Add Images (optional)'),
+            const SizedBox(height: 8),
+
+            Column(
+              children: [
+                if (_imageBytes.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: kBorder, width: 1.5),
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                      itemCount: _imageBytes.length,
+                      itemBuilder: (ctx, idx) => Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(kRadius),
+                            child: Image.memory(
+                              _imageBytes[idx],
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () => _removeImage(idx),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.55),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.all(3),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_imageBytes.isNotEmpty) const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _pickImage,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    height: 96,
+                    decoration: BoxDecoration(
+                      color: kMuted,
+                      borderRadius: BorderRadius.circular(kRadius),
+                      border: Border.all(color: kBorder, width: 1.5),
+                    ),
+                    child: Center(
+                      child: _isPickingImage
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: kPrimary,
+                              ),
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  size: 28,
+                                  color: kMutedForeground,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _imageBytes.isEmpty
+                                      ? 'Click to upload images'
+                                      : 'Add more images',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: kMutedForeground,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kForeground,
+                    side: const BorderSide(color: kBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: kPrimaryForeground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Update Doubt'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _DoubtDetailPage extends StatefulWidget {
-  final Doubt doubt;
-  final void Function(Doubt) onUpdated;
+  final DoubtApiModel doubt;
+  final void Function(DoubtApiModel) onUpdated;
   const _DoubtDetailPage({required this.doubt, required this.onUpdated});
   @override
   State<_DoubtDetailPage> createState() => _DoubtDetailPageState();
 }
 
 class _DoubtDetailPageState extends State<_DoubtDetailPage> {
-  late Doubt _doubt;
+  late DoubtApiModel _doubt;
   final _commentCtrl = TextEditingController();
   List<Uint8List> _commentImageBytes = [];
   bool _isPickingCommentImage = false;
@@ -705,19 +1564,239 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
   final _replyCtrl = TextEditingController();
   final Set<String> _expandedReplies = {};
 
+  String _currentUserName = 'You';
+  String _currentUserAvatar = 'YO';
+
   @override
   void initState() {
     super.initState();
     _doubt = widget.doubt;
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    final name = await _loadUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = name;
+        _currentUserAvatar = _avatarFromName(name);
+      });
+    }
+  }
+
+  Future<void> _editDoubt() async {
+    final result = await showDialog<DoubtApiModel>(
+      context: context,
+      builder: (_) => _EditDoubtDialog(doubt: _doubt),
+    );
+    if (result != null && mounted) {
+      setState(() => _doubt = result);
+      widget.onUpdated(_doubt);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Doubt updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteDoubt() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Doubt'),
+        content: const Text(
+          'Are you sure you want to delete this doubt? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteDoubt(_doubt.id ?? '');
+      if (success && mounted) {
+        Navigator.of(context).pop(); // Go back to list
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Doubt deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete doubt'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editComment(CommentApiModel comment) async {
+    final result = await showDialog<CommentApiModel>(
+      context: context,
+      builder: (_) =>
+          _EditCommentDialog(doubtId: _doubt.id ?? '', comment: comment),
+    );
+    if (result != null && mounted) {
+      final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+      if (updated != null) {
+        setState(() => _doubt = updated);
+        widget.onUpdated(_doubt);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comment updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteComment(String commentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text(
+          'Are you sure you want to delete this comment? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteComment(
+        _doubt.id ?? '',
+        commentId,
+      );
+      if (success && mounted) {
+        final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete comment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editReply(CommentApiModel comment, ReplyApiModel reply) async {
+    final result = await showDialog<ReplyApiModel>(
+      context: context,
+      builder: (_) => _EditReplyDialog(
+        doubtId: _doubt.id ?? '',
+        comment: comment,
+        reply: reply,
+      ),
+    );
+    if (result != null && mounted) {
+      final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+      if (updated != null) {
+        setState(() => _doubt = updated);
+        widget.onUpdated(_doubt);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reply updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteReply(String commentId, String replyId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Reply'),
+        content: const Text(
+          'Are you sure you want to delete this reply? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final success = await DoubtApiService.deleteReply(
+        _doubt.id ?? '',
+        commentId,
+        replyId,
+      );
+      if (success && mounted) {
+        final updated = await DoubtApiService.getDoubtById(_doubt.id ?? '');
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reply deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete reply'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _pickCommentImage() async {
     if (_isPickingCommentImage) return;
     setState(() => _isPickingCommentImage = true);
     try {
-      final bytes = await pickImageFromWeb();
-      if (bytes != null && mounted) {
-        setState(() => _commentImageBytes.add(bytes));
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _commentImageBytes.addAll(bytesList));
       }
     } catch (e) {
       if (mounted) {
@@ -737,45 +1816,116 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
     setState(() => _commentImageBytes.removeAt(index));
   }
 
-  void _addComment() {
+  Future<void> _addComment() async {
     if (_commentCtrl.text.trim().isEmpty && _commentImageBytes.isEmpty) return;
-    setState(() {
-      _doubt.comments.add(
-        Comment(
-          id: generateId(),
-          author: 'You',
-          authorAvatar: 'YO',
-          content: _commentCtrl.text.trim(),
-          createdAt: 'Just now',
-          imageBytes: _commentImageBytes,
-        ),
+
+    final commentText = _commentCtrl.text.trim();
+    final imagesToUpload = List<Uint8List>.from(_commentImageBytes);
+
+    _commentCtrl.clear();
+    _commentImageBytes = [];
+    setState(() {});
+
+    try {
+      List<String> uploadedImageUrls = [];
+      for (int i = 0; i < imagesToUpload.length; i++) {
+        final url = await DoubtApiService.uploadImage(
+          imagesToUpload[i],
+          'comment_image_$i.jpg',
+        );
+        if (url != null) {
+          uploadedImageUrls.add(url);
+        }
+      }
+
+      final comment = await DoubtApiService.addComment(
+        widget.doubt.id ?? '',
+        author: _currentUserName,
+        authorAvatar: _currentUserAvatar,
+        content: commentText,
+        imageUrls: uploadedImageUrls,
       );
-      _commentCtrl.clear();
-      _commentImageBytes = [];
-    });
-    widget.onUpdated(_doubt);
+
+      if (comment != null && mounted) {
+        final updated = await DoubtApiService.getDoubtById(
+          widget.doubt.id ?? '',
+        );
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comment added successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add comment'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
-  void _addReply(String commentId) {
+  Future<void> _addReply(String commentId) async {
     if (_replyCtrl.text.trim().isEmpty) return;
+
+    final replyText = _replyCtrl.text.trim();
+
+    _replyCtrl.clear();
     setState(() {
-      _doubt.comments
-          .firstWhere((c) => c.id == commentId)
-          .replies
-          .add(
-            Reply(
-              id: generateId(),
-              author: 'You',
-              authorAvatar: 'YO',
-              content: _replyCtrl.text.trim(),
-              createdAt: 'Just now',
-            ),
-          );
-      _replyCtrl.clear();
       _replyingTo = null;
       _expandedReplies.add(commentId);
     });
-    widget.onUpdated(_doubt);
+
+    try {
+      final reply = await DoubtApiService.addReply(
+        widget.doubt.id ?? '',
+        commentId,
+        author: _currentUserName,
+        authorAvatar: _currentUserAvatar,
+        content: replyText,
+      );
+
+      if (reply != null && mounted) {
+        final updated = await DoubtApiService.getDoubtById(
+          widget.doubt.id ?? '',
+        );
+        if (updated != null) {
+          setState(() => _doubt = updated);
+          widget.onUpdated(_doubt);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reply added successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add reply'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   @override
@@ -814,7 +1964,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Avatar(initials: _doubt.authorAvatar, size: 48),
+                      _Avatar(initials: _doubt.authorAvatar ?? '??', size: 48),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Row(
@@ -825,7 +1975,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _doubt.title,
+                                    _doubt.title ?? '',
                                     style: const TextStyle(
                                       fontSize: 17,
                                       fontWeight: FontWeight.w600,
@@ -837,7 +1987,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                     spacing: 6,
                                     children: [
                                       Text(
-                                        _doubt.author,
+                                        _doubt.author ?? '',
                                         style: const TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
@@ -846,10 +1996,10 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                       ),
                                       _MonoBadge(
                                         label:
-                                            '@${_doubt.authorAvatar.toLowerCase()}',
+                                            '@${(_doubt.authorAvatar ?? '').toLowerCase()}',
                                       ),
                                       Text(
-                                        '• ${_doubt.createdAt}',
+                                        '• ${formatTimestamp(_doubt.createdAt)}',
                                         style: const TextStyle(
                                           fontSize: 12,
                                           color: kMutedForeground,
@@ -861,7 +2011,35 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _Badge(label: _doubt.subject),
+                            Row(
+                              children: [
+                                _Badge(label: _doubt.subject ?? ''),
+                                if (_doubt.author == _currentUserName) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      size: 18,
+                                      color: kMutedForeground,
+                                    ),
+                                    onPressed: _editDoubt,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      size: 18,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: _deleteDoubt,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -869,14 +2047,14 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _doubt.content,
+                    _doubt.content ?? '',
                     style: const TextStyle(
                       fontSize: 14,
                       color: kForeground,
                       height: 1.6,
                     ),
                   ),
-                  if (_doubt.hasImage) ...[
+                  if (_doubt.hasImage == true) ...[
                     const SizedBox(height: 16),
                     _buildDoubtImage(_doubt),
                   ],
@@ -890,7 +2068,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${_doubt.comments.length} answers',
+                        '${(_doubt.comments?.length) ?? 0} answers',
                         style: const TextStyle(
                           fontSize: 13,
                           color: kMutedForeground,
@@ -919,7 +2097,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _Avatar(initials: 'YO', size: 32),
+                      _Avatar(initials: _currentUserAvatar, size: 32),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -931,7 +2109,6 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                             ),
                             const SizedBox(height: 8),
 
-                            // image picker for multiple answer images
                             Column(
                               children: [
                                 if (_commentImageBytes.isNotEmpty)
@@ -1085,7 +2262,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
             const SizedBox(height: 24),
 
             Text(
-              '${_doubt.comments.length} ${_doubt.comments.length == 1 ? "Answer" : "Answers"}',
+              '${((_doubt.comments?.length) ?? 0)} ${((_doubt.comments?.length) ?? 0) == 1 ? "Answer" : "Answers"}',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -1094,7 +2271,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
             ),
             const SizedBox(height: 12),
 
-            if (_doubt.comments.isEmpty)
+            if ((_doubt.comments?.isEmpty) ?? true)
               _CardContainer(
                 child: const Column(
                   children: [
@@ -1114,13 +2291,13 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                 ),
               ),
 
-            ...List.generate(_doubt.comments.length, (i) {
-              final comment = _doubt.comments[i];
+            ...List.generate((_doubt.comments?.length) ?? 0, (i) {
+              final comment = (_doubt.comments ?? [])[i];
               final isReplying = _replyingTo == comment.id;
               final repliesExpanded = _expandedReplies.contains(comment.id);
               return Padding(
                 padding: EdgeInsets.only(
-                  bottom: i < _doubt.comments.length - 1 ? 16 : 0,
+                  bottom: i < ((_doubt.comments?.length) ?? 0) - 1 ? 16 : 0,
                 ),
                 child: _CardContainer(
                   child: Row(
@@ -1135,7 +2312,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                         ),
                         child: Center(
                           child: Text(
-                            comment.authorAvatar,
+                            comment.authorAvatar ?? '??',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -1154,7 +2331,9 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Text(
-                                  comment.author,
+                                  (comment.author ?? '').toLowerCase() == 'you'
+                                      ? _currentUserName
+                                      : (comment.author ?? ''),
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -1163,10 +2342,10 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                 ),
                                 _MonoBadge(
                                   label:
-                                      '@${comment.authorAvatar.toLowerCase()}',
+                                      '@${((comment.authorAvatar ?? '').toUpperCase() == 'YO' ? _currentUserAvatar : (comment.authorAvatar ?? '')).toLowerCase()}',
                                 ),
                                 Text(
-                                  comment.createdAt,
+                                  formatTimestamp(comment.createdAt),
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: kMutedForeground,
@@ -1176,16 +2355,15 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              comment.content,
+                              comment.content ?? '',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: kForeground,
                                 height: 1.5,
                               ),
                             ),
-                            if (comment.imageBytes.isNotEmpty) ...[
+                            if ((comment.imageUrls?.isNotEmpty) ?? false) ...[
                               const SizedBox(height: 8),
-                              // display multiple images in grid
                               GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -1195,12 +2373,18 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                       crossAxisSpacing: 8,
                                       mainAxisSpacing: 8,
                                     ),
-                                itemCount: comment.imageBytes.length,
+                                itemCount: (comment.imageUrls?.length) ?? 0,
                                 itemBuilder: (ctx, idx) => ClipRRect(
                                   borderRadius: BorderRadius.circular(kRadius),
-                                  child: Image.memory(
-                                    comment.imageBytes[idx],
+                                  child: Image.network(
+                                    'http://localhost:8000/${comment.imageUrls?[idx] ?? ''}',
                                     fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: kMutedForeground.withOpacity(0.2),
+                                      child: const Icon(
+                                        Icons.image_not_supported,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1217,19 +2401,38 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                         : comment.id,
                                   ),
                                 ),
-                                if (comment.replies.isNotEmpty) ...[
+                                if ((comment.replies?.isNotEmpty) ?? false) ...[
                                   const SizedBox(width: 8),
                                   _GhostButton(
                                     icon: repliesExpanded
                                         ? Icons.expand_less
                                         : Icons.expand_more,
                                     label:
-                                        '${comment.replies.length} ${comment.replies.length == 1 ? "reply" : "replies"}',
+                                        '${(comment.replies?.length) ?? 0} ${((comment.replies?.length) ?? 0) == 1 ? "reply" : "replies"}',
                                     onTap: () => setState(
                                       () => repliesExpanded
-                                          ? _expandedReplies.remove(comment.id)
-                                          : _expandedReplies.add(comment.id),
+                                          ? _expandedReplies.remove(
+                                              comment.id ?? '',
+                                            )
+                                          : _expandedReplies.add(
+                                              comment.id ?? '',
+                                            ),
                                     ),
+                                  ),
+                                ],
+                                if (comment.author == _currentUserName) ...[
+                                  const SizedBox(width: 8),
+                                  _GhostButton(
+                                    icon: Icons.edit,
+                                    label: 'Edit',
+                                    onTap: () => _editComment(comment),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  _GhostButton(
+                                    icon: Icons.delete,
+                                    label: 'Delete',
+                                    onTap: () =>
+                                        _deleteComment(comment.id ?? ''),
                                   ),
                                 ],
                               ],
@@ -1239,7 +2442,10 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const _Avatar(initials: 'YO', size: 28),
+                                  _Avatar(
+                                    initials: _currentUserAvatar,
+                                    size: 28,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Column(
@@ -1271,7 +2477,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                             const SizedBox(width: 8),
                                             ElevatedButton(
                                               onPressed: () =>
-                                                  _addReply(comment.id),
+                                                  _addReply(comment.id ?? ''),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: kPrimary,
                                                 foregroundColor:
@@ -1303,7 +2509,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                               ),
                             ],
                             if (repliesExpanded &&
-                                comment.replies.isNotEmpty) ...[
+                                ((comment.replies?.isNotEmpty) ?? false)) ...[
                               const SizedBox(height: 16),
                               Container(
                                 decoration: const BoxDecoration(
@@ -1314,12 +2520,16 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                 padding: const EdgeInsets.only(left: 16),
                                 child: Column(
                                   children: List.generate(
-                                    comment.replies.length,
+                                    (comment.replies?.length) ?? 0,
                                     (j) {
-                                      final reply = comment.replies[j];
+                                      final reply = (comment.replies ?? [])[j];
                                       return Padding(
                                         padding: EdgeInsets.only(
-                                          bottom: j < comment.replies.length - 1
+                                          bottom:
+                                              j <
+                                                  ((comment.replies?.length) ??
+                                                          0) -
+                                                      1
                                               ? 12
                                               : 0,
                                         ),
@@ -1337,7 +2547,7 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                               ),
                                               child: Center(
                                                 child: Text(
-                                                  reply.authorAvatar,
+                                                  reply.authorAvatar ?? '??',
                                                   style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.w600,
@@ -1356,7 +2566,12 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                                     spacing: 6,
                                                     children: [
                                                       Text(
-                                                        reply.author,
+                                                        (reply.author ?? '')
+                                                                    .toLowerCase() ==
+                                                                'you'
+                                                            ? _currentUserName
+                                                            : (reply.author ??
+                                                                  ''),
                                                         style: const TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
@@ -1366,10 +2581,12 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                                       ),
                                                       _MonoBadge(
                                                         label:
-                                                            '@${reply.authorAvatar.toLowerCase()}',
+                                                            '@${((reply.authorAvatar ?? '').toUpperCase() == 'YO' ? _currentUserAvatar : (reply.authorAvatar ?? '')).toLowerCase()}',
                                                       ),
                                                       Text(
-                                                        reply.createdAt,
+                                                        formatTimestamp(
+                                                          reply.createdAt,
+                                                        ),
                                                         style: const TextStyle(
                                                           fontSize: 10,
                                                           color:
@@ -1379,12 +2596,60 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                                                     ],
                                                   ),
                                                   const SizedBox(height: 4),
-                                                  Text(
-                                                    reply.content,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: kForeground,
-                                                    ),
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          reply.content ?? '',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    kForeground,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                      if (reply.author ==
+                                                          _currentUserName) ...[
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        IconButton(
+                                                          icon: const Icon(
+                                                            Icons.edit,
+                                                            size: 14,
+                                                            color:
+                                                                kMutedForeground,
+                                                          ),
+                                                          onPressed: () =>
+                                                              _editReply(
+                                                                comment,
+                                                                reply,
+                                                              ),
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(),
+                                                        ),
+                                                        IconButton(
+                                                          icon: const Icon(
+                                                            Icons.delete,
+                                                            size: 14,
+                                                            color: Colors.red,
+                                                          ),
+                                                          onPressed: () =>
+                                                              _deleteReply(
+                                                                comment.id ??
+                                                                    '',
+                                                                reply.id ?? '',
+                                                              ),
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(),
+                                                        ),
+                                                      ],
+                                                    ],
                                                   ),
                                                 ],
                                               ),
@@ -1405,6 +2670,473 @@ class _DoubtDetailPageState extends State<_DoubtDetailPage> {
                 ),
               );
             }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Edit Comment Dialog ─────────────────────────────────────────────────────
+
+class _EditCommentDialog extends StatefulWidget {
+  final String doubtId;
+  final CommentApiModel comment;
+  const _EditCommentDialog({required this.doubtId, required this.comment});
+  @override
+  State<_EditCommentDialog> createState() => _EditCommentDialogState();
+}
+
+class _EditCommentDialogState extends State<_EditCommentDialog> {
+  late final TextEditingController _contentCtrl;
+  List<Uint8List> _imageBytes = [];
+  bool _isPickingImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentCtrl = TextEditingController(text: widget.comment.content);
+  }
+
+  @override
+  void dispose() {
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    if (_isPickingImage) return;
+    setState(() => _isPickingImage = true);
+    try {
+      final bytesList = await pickImagesFromWeb();
+      if (bytesList.isNotEmpty && mounted) {
+        setState(() => _imageBytes.addAll(bytesList));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not pick image: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false);
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() => _imageBytes.removeAt(index));
+  }
+
+  Future<void> _submit() async {
+    if (_contentCtrl.text.trim().isEmpty &&
+        _imageBytes.isEmpty &&
+        (widget.comment.imageUrls?.isEmpty ?? true)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add content or images')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      List<String> uploadedImageUrls = List.from(
+        widget.comment.imageUrls ?? [],
+      );
+      if (_imageBytes.isNotEmpty) {
+        for (int i = 0; i < _imageBytes.length; i++) {
+          final url = await DoubtApiService.uploadImage(
+            _imageBytes[i],
+            'comment_image_$i.jpg',
+          );
+          if (url != null) {
+            uploadedImageUrls.add(url);
+          }
+        }
+      }
+
+      final success = await DoubtApiService.updateComment(
+        widget.doubtId,
+        widget.comment.id ?? '',
+        content: _contentCtrl.text.trim().isEmpty
+            ? null
+            : _contentCtrl.text.trim(),
+        imageUrls: uploadedImageUrls,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        final updated = CommentApiModel(
+          id: widget.comment.id,
+          author: widget.comment.author,
+          authorAvatar: widget.comment.authorAvatar,
+          content: _contentCtrl.text.trim(),
+          imageUrls: uploadedImageUrls,
+          createdAt: widget.comment.createdAt,
+          replies: widget.comment.replies,
+        );
+        Navigator.of(context).pop(updated);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update comment'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kRadius),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Comment',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: kForeground,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const _FormLabel('Content'),
+            const SizedBox(height: 8),
+            _StyledTextArea(
+              controller: _contentCtrl,
+              hint: 'Edit your comment...',
+              minLines: 3,
+            ),
+            const SizedBox(height: 16),
+
+            const _FormLabel('Add Images (optional)'),
+            const SizedBox(height: 8),
+
+            Column(
+              children: [
+                if (_imageBytes.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: kBorder, width: 1.5),
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                      itemCount: _imageBytes.length,
+                      itemBuilder: (ctx, idx) => Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(kRadius),
+                            child: Image.memory(
+                              _imageBytes[idx],
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () => _removeImage(idx),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.55),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.all(3),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_imageBytes.isNotEmpty) const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _pickImage,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: kMuted,
+                      borderRadius: BorderRadius.circular(kRadius),
+                      border: Border.all(color: kBorder, width: 1.5),
+                    ),
+                    child: Center(
+                      child: _isPickingImage
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: kPrimary,
+                              ),
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  size: 24,
+                                  color: kMutedForeground,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _imageBytes.isEmpty
+                                      ? 'Click to upload images'
+                                      : 'Add more images',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: kMutedForeground,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kForeground,
+                    side: const BorderSide(color: kBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: kPrimaryForeground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Update Comment'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Edit Reply Dialog ───────────────────────────────────────────────────────
+
+class _EditReplyDialog extends StatefulWidget {
+  final String doubtId;
+  final CommentApiModel comment;
+  final ReplyApiModel reply;
+  const _EditReplyDialog({
+    required this.doubtId,
+    required this.comment,
+    required this.reply,
+  });
+  @override
+  State<_EditReplyDialog> createState() => _EditReplyDialogState();
+}
+
+class _EditReplyDialogState extends State<_EditReplyDialog> {
+  late final TextEditingController _contentCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentCtrl = TextEditingController(text: widget.reply.content);
+  }
+
+  @override
+  void dispose() {
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_contentCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please add content')));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+
+    try {
+      final updatedReply = await DoubtApiService.updateReply(
+        widget.doubtId,
+        widget.comment.id ?? '',
+        widget.reply.id ?? '',
+        author: widget.reply.author ?? '',
+        authorAvatar: widget.reply.authorAvatar ?? '',
+        content: _contentCtrl.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (updatedReply != null) {
+        Navigator.of(context).pop(updatedReply);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update reply'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: kCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kRadius),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Reply',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: kForeground,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const _FormLabel('Content'),
+            const SizedBox(height: 8),
+            _StyledTextArea(
+              controller: _contentCtrl,
+              hint: 'Edit your reply...',
+              minLines: 2,
+            ),
+
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kForeground,
+                    side: const BorderSide(color: kBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: kPrimaryForeground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: const Text('Update Reply'),
+                ),
+              ],
+            ),
           ],
         ),
       ),

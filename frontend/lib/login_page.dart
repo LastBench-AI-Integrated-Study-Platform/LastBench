@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../deadline_provider.dart';
 import 'last_bench_home.dart';
 import 'forgot_password_flow.dart';
 
@@ -30,26 +32,31 @@ class _LoginPageState extends State<LoginPage> {
 
   void submitLogin() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
     setState(() {
       isLoading = true;
       error = null;
     });
 
     try {
+      // ✅ login — AuthService now saves email to localStorage
       await AuthService.login(
-        email: emailController.text,
+        email: emailController.text.trim(),
         password: passwordController.text,
       );
 
-      if (!mounted) return;
+      if (context.mounted) {
+        // ✅ tell DeadlineProvider to fetch from MongoDB now
+        await context.read<DeadlineProvider>().loadFromServer();
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const LastBenchHome(),
-        ),
-      );
+        // ✅ go to home
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -134,6 +141,7 @@ class _LoginPageState extends State<LoginPage> {
                 Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 420),
+                    constraints: const BoxConstraints(maxWidth: 420),
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
@@ -163,7 +171,6 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
 
-                            // Email
                             const Text(
                               "Email Address",
                               style: TextStyle(
@@ -177,6 +184,8 @@ class _LoginPageState extends State<LoginPage> {
                               controller: emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
+                                prefixIcon:
+                                    const Icon(Icons.mail, color: navy),
                                 hintText: "yourname@example.com",
                                 hintStyle: const TextStyle(
                                   fontSize: 14,
@@ -209,20 +218,18 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty) {
+                                if (value == null || value.isEmpty)
                                   return "Email is required";
                                 }
                                 if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
                                     .hasMatch(value)) {
                                   return "Enter a valid email";
-                                }
                                 return null;
                               },
                             ),
 
                             const SizedBox(height: 20),
 
-                            // Password
                             const Text(
                               "Password",
                               style: TextStyle(
@@ -236,23 +243,14 @@ class _LoginPageState extends State<LoginPage> {
                               controller: passwordController,
                               obscureText: !showPassword,
                               decoration: InputDecoration(
-                                hintText: "Enter your password",
-                                hintStyle: const TextStyle(
-                                  fontSize: 14,
-                                  color: hintGrey,
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.lock_outline,
-                                  color: hintGrey,
-                                  size: 20,
-                                ),
+                                prefixIcon:
+                                    const Icon(Icons.lock, color: navy),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     showPassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: hintGrey,
-                                    size: 20,
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: navy,
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -279,9 +277,8 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null || value.length < 6) {
+                                if (value == null || value.length < 6)
                                   return "Password must be at least 6 characters";
-                                }
                                 return null;
                               },
                             ),

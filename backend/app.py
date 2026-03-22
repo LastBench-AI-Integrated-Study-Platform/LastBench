@@ -7,6 +7,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles      # ← ADD THIS
 from dotenv import load_dotenv
 
 from pypdf import PdfReader
@@ -18,10 +19,15 @@ import faiss
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 
+import socketio as _sio_module
 from routes.auth_routes import router as auth_router
 from routes.insights_routes import router as insights_router
+from routes.doubt_routes import router as doubt_router
 from routes.chat_routes import router as chat_router
-from routes import combined_routes   # ✅ if you want /api routes
+from routes import combined_routes
+from routes.deadline_routes import router as deadline_router
+from routes.call_routes import router as call_router
+from socket_manager import sio
 
 # ================= CONFIG =================
 load_dotenv()
@@ -29,7 +35,7 @@ load_dotenv()
 # ================= INIT =================
 app = FastAPI(title="PDF Question Answering with Groq")
 
-# ✅ CORS (ONLY ONCE)
+# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,11 +44,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Include routers (ONLY ONCE)
+# ✅ Include routers
 app.include_router(auth_router)
 app.include_router(insights_router)
+app.include_router(doubt_router)
 app.include_router(chat_router)
 app.include_router(combined_routes.router, prefix="/api")
+
+# ✅ Serve uploaded files as static assets
+# Ensures /uploads/doubt_images/filename.jpg works in the browser
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+(UPLOAD_DIR / "doubt_images").mkdir(exist_ok=True)   # ← ensure subfolder exists too
+from fastapi.responses import FileResponse
+import os
+
+# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+@app.get("/uploads/{file_path:path}")
+async def serve_uploaded_file(file_path: str):
+    full_path = UPLOAD_DIR / file_path
+    if full_path.exists() and full_path.is_file():
+        return FileResponse(full_path)
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="File not found")
+
+app.include_router(deadline_router)
+app.include_router(call_router)
+
+# ✅ Mount Socket.IO on top of FastAPI — run with: uvicorn app:socket_app
+socket_app = _sio_module.ASGIApp(sio, app)
+
 
 # ================= GROQ + EMBEDDINGS =================
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -50,9 +82,6 @@ embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 vector_store = None
 documents = []
-
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
 
 
 # ================= HELPERS =================

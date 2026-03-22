@@ -1,10 +1,27 @@
 import 'dart:convert';
+import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  static const String baseUrl = "http://192.168.0.7:8000";
-  static String? currentUserEmail;
+  static const String baseUrl = "http://127.0.0.1:8000";
 
+  // ── Save/Get email from localStorage ─────────────────────────────────────
+  static void saveUserEmail(String email, [String? name]) {
+    html.window.localStorage['lb_user_email'] = email;
+    if (name != null) {
+      html.window.localStorage['lb_user_name'] = name;
+    }
+  }
+
+  static String? getUserEmail() {
+    return html.window.localStorage['lb_user_email'];
+  }
+
+  static String? getUserName() {
+    return html.window.localStorage['lb_user_name'];
+  }
+
+  // ── Signup ────────────────────────────────────────────────────────────────
   static Future<String> signup({
     required String name,
     required String email,
@@ -21,14 +38,13 @@ class AuthService {
         "exam": exam,
       }),
     );
-
     final data = jsonDecode(res.body);
-    if (res.statusCode != 200) {
-      throw data["detail"];
-    }
+    if (res.statusCode != 200) throw data["detail"];
+    saveUserEmail(email, name); // ✅ save email and name
     return data["message"];
   }
 
+  // ── Login ─────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -38,15 +54,25 @@ class AuthService {
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({"email": email, "password": password}),
     );
-
     final data = jsonDecode(res.body);
-    if (res.statusCode != 200) {
-      throw data["detail"];
-    }
+    if (res.statusCode != 200) throw data["detail"];
+    // Save all essential fields
+    html.window.localStorage['lb_user_email'] = email;
+    html.window.localStorage['lb_user_name'] = data["user"]["name"] ?? '';
+    html.window.localStorage['lb_user_id'] = data["user"]["_id"] ?? '';
+    html.window.localStorage['lb_user_username'] = data["user"]["username"] ?? '';
     
     currentUserEmail = email; // Store the email for other services
     
     return data;
+  }
+
+  /// Logout user by clearing local storage
+  static Future<void> logout() async {
+    html.window.localStorage.remove('lb_user_email');
+    html.window.localStorage.remove('lb_user_name');
+    html.window.localStorage.remove('lb_user_id');
+    html.window.localStorage.remove('lb_user_username');
   }
 
   /// Request an OTP to be sent to the user's email.

@@ -1,6 +1,7 @@
 /// Configuration file for LastBench application
 /// This allows the app to work across different devices and systems
 /// without hardcoded URLs
+library;
 
 class AppConfig {
   // API Base URL - Change this for different environments

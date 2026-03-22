@@ -9,6 +9,8 @@ import 'package:http_parser/http_parser.dart';
 
 
 class UploadScreen extends StatefulWidget {
+  const UploadScreen({super.key});
+
   @override
   State<UploadScreen> createState() => _UploadScreenState();
 }

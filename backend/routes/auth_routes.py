@@ -1,11 +1,11 @@
 from fastapi import APIRouter, HTTPException, Form, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from utils.security import hash_password, verify_password
 from db.connection import db
-from models.user_model import UserSignup, UserLogin
+from models.user_model import UserSignup, UserLogin, UserProfile
 
 # Models for reset flow
 class ResetCreate(BaseModel):
@@ -32,11 +32,22 @@ async def signup(user: UserSignup):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Initialize streak data for new user
+    today = datetime.now().strftime("%Y-%m-%d")
     db.users.insert_one({
         "name": user.name,
         "email": user.email,
         "password": hash_password(user.password),
-        "exam": user.exam
+        "exam": user.exam,
+        "bio": "",
+        "education": "",
+        "internship": "",
+        "job": "",
+        "skills": "",
+        "profile_image_base64": "",
+        "current_streak": 0,
+        "last_study_date": None,
+        "study_dates": []
     })
 
     return {"message": "Signup successful"}
@@ -54,9 +65,77 @@ async def login(user: UserLogin):
     return {
         "message": "Login successful",
         "user": {
+            "_id": str(db_user["_id"]),
+            "username": db_user.get("username", ""),
             "name": db_user["name"],
             "email": db_user["email"],
-            "exam": db_user["exam"]
+            "exam": db_user["exam"],
+            "bio": db_user.get("bio", ""),
+            "education": db_user.get("education", ""),
+            "internship": db_user.get("internship", ""),
+            "job": db_user.get("job", ""),
+            "skills": db_user.get("skills", ""),
+            "profile_image_base64": db_user.get("profile_image_base64", ""),
+            "current_streak": db_user.get("current_streak", 0),
+            "last_study_date": db_user.get("last_study_date"),
+            "study_dates": db_user.get("study_dates", [])
+        }
+    }
+
+
+@router.get("/profile")
+async def get_profile(email: str):
+    user = db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "email": user["email"],
+        "name": user.get("name", ""),
+        "bio": user.get("bio", ""),
+        "education": user.get("education", ""),
+        "internship": user.get("internship", ""),
+        "job": user.get("job", ""),
+        "skills": user.get("skills", ""),
+        "profile_image_base64": user.get("profile_image_base64", ""),
+        "exam": user.get("exam", ""),
+    }
+
+
+@router.post("/profile")
+async def update_profile(profile: UserProfile):
+    user = db.users.find_one({"email": profile.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_data = {
+        "name": profile.name or user.get("name", ""),
+        "bio": profile.bio or "",
+        "education": profile.education or "",
+        "internship": profile.internship or "",
+        "job": profile.job or "",
+        "skills": profile.skills or "",
+        "profile_image_base64": profile.profile_image_base64 or "",
+    }
+
+    # keep exam if not provided
+    if profile.name:
+        update_data["name"] = profile.name
+
+    db.users.update_one({"email": profile.email}, {"$set": update_data})
+
+    updated_user = db.users.find_one({"email": profile.email})
+    return {
+        "message": "Profile updated",
+        "profile": {
+            "email": updated_user["email"],
+            "name": updated_user.get("name", ""),
+            "bio": updated_user.get("bio", ""),
+            "education": updated_user.get("education", ""),
+            "internship": updated_user.get("internship", ""),
+            "job": updated_user.get("job", ""),
+            "skills": updated_user.get("skills", ""),
+            "profile_image_base64": updated_user.get("profile_image_base64", ""),
         }
     }
 
@@ -232,11 +311,65 @@ def direct_reset_password(req: DirectResetRequest):
     """Directly reset password without OTP verification (per user request)."""
     email = req.email.lower()
     
+# ---------------------------------------------------------------------------
+# Streak Flow
+# ---------------------------------------------------------------------------
+@router.get("/streak/current")
+async def get_current_streak(email: str):
     user = db.users.find_one({"email": email})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    db.users.update_one({"email": email}, {"$set": {"password": hash_password(req.new_password)}})
+    return {
+        "current_streak": user.get("current_streak", 0),
+        "last_study_date": user.get("last_study_date"),
+        "study_dates": user.get("study_dates", [])
+    }
+
+class StreakUpdateRequest(BaseModel):
+    email: str
+
+@router.post("/streak/update")
+async def update_streak(req: StreakUpdateRequest):
+    user = db.users.find_one({"email": req.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     
-    return {"message": "Password updated successfully"}
+    current_streak = user.get("current_streak", 0)
+    last_study_date = user.get("last_study_date")
+    study_dates = user.get("study_dates", [])
+    
+    if last_study_date == today_str:
+        # Already studied today, no change
+        pass
+    elif last_study_date == yesterday_str:
+        # Studied yesterday, continue streak
+        current_streak += 1
+        last_study_date = today_str
+        if today_str not in study_dates:
+            study_dates.append(today_str)
+    else:
+        # Streak broken or new streak
+        current_streak = 1
+        last_study_date = today_str
+        if today_str not in study_dates:
+            study_dates.append(today_str)
+            
+    db.users.update_one(
+        {"email": req.email},
+        {"$set": {
+            "current_streak": current_streak,
+            "last_study_date": last_study_date,
+            "study_dates": study_dates
+        }}
+    )
+    
+    return {
+        "current_streak": current_streak,
+        "last_study_date": last_study_date,
+        "study_dates": study_dates
+    }
 

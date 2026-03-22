@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
-import 'chat_home_page.dart';
-import 'doubt_section.dart'; // ← imported
+import 'pages/call_contacts_page.dart';import 'chat_home_page.dart';
+import 'doubt_section.dart';
+import 'login_page.dart';
+import 'profile_creation_page.dart';
+import 'services/streak_service.dart';
+import 'services/auth_service.dart';
 
 class LastBenchHome extends StatefulWidget {
   final String? userName;
-  const LastBenchHome({super.key, this.userName});
+  final String? userEmail;
+  const LastBenchHome({super.key, this.userName, this.userEmail});
 
   @override
   State<LastBenchHome> createState() => _LastBenchHomeState();
@@ -18,6 +27,106 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   // Colors
   static const Color navy = Color(0xFF033F63);
   static const Color teal = Color(0xFF379392);
+
+  // ── Scroll controller + key for Doubts Section ──
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _doubtsSectionKey = GlobalKey();
+
+  // Streak state
+  int _currentStreak = 0;
+  bool _isStreakLoading = true;
+
+  // Profile state
+  String? _profileImageBase64;
+
+  String? get currentEmail => widget.userEmail ?? AuthService.getUserEmail();
+  String? get currentUserName => widget.userName ?? AuthService.getUserName();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStreak();
+    _loadProfileImage();
+  }
+
+  Future<void> _loadStreak() async {
+    if (currentEmail == null) {
+      setState(() => _isStreakLoading = false);
+      return;
+    }
+
+    try {
+      final streakData = await StreakService.getCurrentStreak(
+        currentEmail!,
+      );
+      setState(() {
+        _currentStreak = streakData['current_streak'] ?? 0;
+        _isStreakLoading = false;
+      });
+    } catch (e) {
+      print('Error loading streak: $e');
+      setState(() => _isStreakLoading = false);
+    }
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _profileImageBase64 = prefs.getString('profile_image_base64');
+    });
+  }
+
+  Future<void> _updateStreak() async {
+    if (currentEmail == null) return;
+
+    try {
+      final streakData = await StreakService.updateStreak(currentEmail!);
+      setState(() {
+        _currentStreak = streakData['current_streak'] ?? 0;
+      });
+    } catch (e) {
+      print('Error updating streak: $e');
+    }
+  }
+
+  void _scrollToDoubts() {
+    final ctx = _doubtsSectionKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    await AuthService.logout();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+  }
+
+  Widget _buildProfileIcon() {
+    if (_profileImageBase64 != null) {
+      final bytes = base64Decode(_profileImageBase64!);
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: MemoryImage(Uint8List.fromList(bytes)),
+      );
+    } else {
+      return const Icon(Icons.account_circle, color: Colors.white, size: 32);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   // Quick actions
   final List<Map<String, dynamic>> quickActions = [
@@ -89,56 +198,124 @@ class _LastBenchHomeState extends State<LastBenchHome> {
 
       floatingActionButton: FloatingActionButton(
         backgroundColor: teal,
-        onPressed: () {},
+        onPressed: _scrollToDoubts,
         child: const Icon(Icons.help_outline),
       ),
 
       body: SingleChildScrollView(
+        controller: _scrollController, // ← attached
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Greeting ─────────────────────────────────────────────────
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
               color: navy,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  Text(
-                    "Hey ${widget.userName ?? 'Dude'}! 👋",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    "Back bencher today, topper tomorrow 😌",
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.local_fire_department, color: Colors.orange),
-                        SizedBox(width: 6),
-                        Text(
-                          "4-day study streak",
-                          style: TextStyle(color: Colors.white),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Hey ${currentUserName ?? 'Student'}! 👋",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Back bencher today, topper tomorrow 😌",
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.local_fire_department,
+                              color: Colors.orange,
+                            ),
+                            const SizedBox(width: 6),
+                            _isStreakLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    _currentStreak == 0
+                                        ? "Start your streak!"
+                                        : "${_currentStreak}-day study streak",
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: PopupMenuButton<String>(
+                      onSelected: (String value) {
+                        if (value == 'create_profile') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProfileCreationPage(
+                                userEmail: currentEmail,
+                              ),
+                            ),
+                          ).then((_) => _loadProfileImage());
+                        } else if (value == 'view_edit_profile') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProfileCreationPage(
+                                userEmail: currentEmail,
+                                isEditing: true,
+                              ),
+                            ),
+                          ).then((_) => _loadProfileImage());
+                        } else if (value == 'logout') {
+                          // Clear user data and navigate to login
+                          _logout();
+                        }
+                      },
+                      itemBuilder: (BuildContext context) =>
+                          <PopupMenuEntry<String>>[
+                            const PopupMenuItem<String>(
+                              value: 'create_profile',
+                              child: Text('Create Profile'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'view_edit_profile',
+                              child: Text('View and Edit Profile'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'logout',
+                              child: Text('Logout'),
+                            ),
+                          ],
+                      icon: _buildProfileIcon(),
                     ),
                   ),
                 ],
@@ -174,7 +351,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                             MaterialPageRoute(
                               builder: (context) => UploadScreen(),
                             ),
-                          );
+                          ).then((_) => _updateStreak());
                         } else if (action["title"] ==
                             "Quiz cards + Flashcards") {
                           Navigator.push(
@@ -182,7 +359,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                             MaterialPageRoute(
                               builder: (context) => const UploadFileScreen(),
                             ),
-                          );
+                          ).then((_) => _updateStreak());
                         } else if (action["title"] == "Deadline Tracker") {
                           Navigator.push(
                             context,
@@ -195,6 +372,16 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => const ChatHomePage(),
+                            ),
+                          );
+                        } else if (action["title"] == "Ask a Doubt") {
+                          // ← scroll to doubts section
+                          _scrollToDoubts();
+                        } else if (action["title"] == "Join Study Call") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CallContactsPage(),
                             ),
                           );
                         }
@@ -244,13 +431,13 @@ class _LastBenchHomeState extends State<LastBenchHome> {
               ),
             ),
 
-            // ── Daily Insights ────────────────────────────────────────────
+            // Daily Insights (Dynamic)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: DailyInsightsCard(),
             ),
 
-            // ── Study Rooms Header ────────────────────────────────────────
+            // Study Rooms Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -384,9 +571,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
             ),
 
             // ── Doubts Section ────────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: DoubtsSection(),
+            Padding(
+              key: _doubtsSectionKey, // ← GlobalKey attached here
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: const DoubtsSection(),
             ),
 
             const SizedBox(height: 80),
