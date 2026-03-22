@@ -61,6 +61,9 @@ class AuthService {
     html.window.localStorage['lb_user_name'] = data["user"]["name"] ?? '';
     html.window.localStorage['lb_user_id'] = data["user"]["_id"] ?? '';
     html.window.localStorage['lb_user_username'] = data["user"]["username"] ?? '';
+    
+    currentUserEmail = email; // Store the email for other services
+    
     return data;
   }
 
@@ -126,6 +129,27 @@ class AuthService {
     final data = jsonDecode(res.body);
     if (res.statusCode != 200) {
       throw data["detail"] ?? "Password reset failed";
+    }
+    return data["message"] as String;
+  }
+
+  /// Reset password directly without OTP.
+  static Future<String> resetPasswordDirectly({
+    required String email,
+    required String newPassword,
+  }) async {
+    final res = await http.post(
+      Uri.parse("$baseUrl/auth/reset_password/direct"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "email": email,
+        "new_password": newPassword,
+      }),
+    );
+
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) {
+      throw data["detail"] ?? "Password update failed";
     }
     return data["message"] as String;
   }

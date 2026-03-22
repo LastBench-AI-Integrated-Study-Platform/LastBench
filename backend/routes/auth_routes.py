@@ -302,6 +302,15 @@ def reset_password(req: ResetPasswordRequest):
     return {"message": "Password reset successful"}
 
 
+class DirectResetRequest(BaseModel):
+    email: str
+    new_password: str
+
+@router.post("/reset_password/direct")
+def direct_reset_password(req: DirectResetRequest):
+    """Directly reset password without OTP verification (per user request)."""
+    email = req.email.lower()
+    
 # ---------------------------------------------------------------------------
 # Streak Flow
 # ---------------------------------------------------------------------------

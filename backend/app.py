@@ -23,6 +23,7 @@ import socketio as _sio_module
 from routes.auth_routes import router as auth_router
 from routes.insights_routes import router as insights_router
 from routes.doubt_routes import router as doubt_router
+from routes.chat_routes import router as chat_router
 from routes import combined_routes
 from routes.deadline_routes import router as deadline_router
 from routes.call_routes import router as call_router
@@ -47,6 +48,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(insights_router)
 app.include_router(doubt_router)
+app.include_router(chat_router)
 app.include_router(combined_routes.router, prefix="/api")
 
 # ✅ Serve uploaded files as static assets

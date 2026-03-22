@@ -5,7 +5,7 @@ library;
 
 class AppConfig {
   // API Base URL - Change this for different environments
-  static const String apiBaseUrl = "http://localhost:8000/api";
+  static const String apiBaseUrl = "http://192.168.0.7:8000/api";
 
   // Quiz and Flashcard generation parameters
   static const int numQuestions = 3;

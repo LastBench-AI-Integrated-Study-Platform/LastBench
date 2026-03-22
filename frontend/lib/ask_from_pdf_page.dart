@@ -94,7 +94,7 @@ class _UploadScreenState extends State<UploadScreen> {
   setState(() => uploadProgress = 0.0);
 
   try {
-    final uri = Uri.parse("http://127.0.0.1:8000/analyze");
+    final uri = Uri.parse("http://192.168.0.7:8000/analyze");
     final request = http.MultipartRequest('POST', uri);
 
     request.files.add(http.MultipartFile.fromBytes('notes', notesPdfBytes!, filename: notesPdfName, contentType: MediaType('application', 'pdf')));
