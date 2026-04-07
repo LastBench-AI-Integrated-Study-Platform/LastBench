@@ -44,25 +44,33 @@ class AuthService {
     return data["message"];
   }
 
-  // ── Login ─────────────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>> login({
-    required String email,
-    required String password,
-  }) async {
-    final res = await http.post(
-      Uri.parse("$baseUrl/auth/login"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"email": email, "password": password}),
-    );
-    final data = jsonDecode(res.body);
-    if (res.statusCode != 200) throw data["detail"];
-    // Save all essential fields
-    html.window.localStorage['lb_user_email'] = email;
-    html.window.localStorage['lb_user_name'] = data["user"]["name"] ?? '';
-    html.window.localStorage['lb_user_id'] = data["user"]["_id"] ?? '';
-    html.window.localStorage['lb_user_username'] = data["user"]["username"] ?? '';
-    return data;
+  required String email,
+  required String password,
+}) async {
+  final res = await http.post(
+    Uri.parse("$baseUrl/auth/login"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({"email": email, "password": password}),
+  );
+
+  final data = jsonDecode(res.body);
+  print("LOGIN RESPONSE: $data"); // 🔍 DEBUG
+
+  if (res.statusCode != 200) {
+    throw data["detail"] ?? "Login failed";
   }
+
+  // ✅ SAFE access
+  final user = data["user"] ?? {};
+
+  html.window.localStorage['lb_user_email'] = email;
+  html.window.localStorage['lb_user_name'] = user["name"] ?? '';
+  html.window.localStorage['lb_user_id'] = user["_id"] ?? '';
+  html.window.localStorage['lb_user_username'] = user["username"] ?? '';
+
+  return data;
+}
 
   /// Logout user by clearing local storage
   static Future<void> logout() async {
