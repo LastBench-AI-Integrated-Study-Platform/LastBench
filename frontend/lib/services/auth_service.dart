@@ -1,25 +1,45 @@
 import 'dart:convert';
-import 'dart:html' as html;
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../config.dart';
 
 class AuthService {
-  static const String baseUrl = "http://127.0.0.1:8000";
+  static String get baseUrl => AppConfig.apiBaseUrl;
 
-  // ── Save/Get email from localStorage ─────────────────────────────────────
-  static void saveUserEmail(String email, [String? name]) {
-    html.window.localStorage['lb_user_email'] = email;
+  static String? _cachedEmail;
+  static String? _cachedName;
+
+  // ── Save/Get email from SharedPreferences ──────────────────────────────────
+  static Future<void> saveUserEmail(String email, [String? name]) async {
+    _cachedEmail = email;
     if (name != null) {
-      html.window.localStorage['lb_user_name'] = name;
+      _cachedName = name;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lb_user_email', email);
+    if (name != null) {
+      await prefs.setString('lb_user_name', name);
     }
   }
 
-  static String? getUserEmail() {
-    return html.window.localStorage['lb_user_email'];
+  static Future<String?> getUserEmail() async {
+    if (_cachedEmail != null) return _cachedEmail;
+    final prefs = await SharedPreferences.getInstance();
+    _cachedEmail = prefs.getString('lb_user_email');
+    return _cachedEmail;
   }
 
-  static String? getUserName() {
-    return html.window.localStorage['lb_user_name'];
+  // Synchronous access - works better after first getUserEmail() call or login
+  static String? get currentUserEmail => _cachedEmail;
+
+  static Future<String?> getUserName() async {
+    if (_cachedName != null) return _cachedName;
+    final prefs = await SharedPreferences.getInstance();
+    _cachedName = prefs.getString('lb_user_name');
+    return _cachedName;
   }
+  
+  static String? get currentUserName => _cachedName;
 
   // ── Signup ────────────────────────────────────────────────────────────────
   static Future<String> signup({
@@ -40,7 +60,7 @@ class AuthService {
     );
     final data = jsonDecode(res.body);
     if (res.statusCode != 200) throw data["detail"];
-    saveUserEmail(email, name); // ✅ save email and name
+    await saveUserEmail(email, name); // ✅ save email and name
     return data["message"];
   }
 
@@ -63,21 +83,25 @@ class AuthService {
 
   // ✅ SAFE access
   final user = data["user"] ?? {};
+  _cachedEmail = email;
+  _cachedName = user["name"];
 
-  html.window.localStorage['lb_user_email'] = email;
-  html.window.localStorage['lb_user_name'] = user["name"] ?? '';
-  html.window.localStorage['lb_user_id'] = user["_id"] ?? '';
-  html.window.localStorage['lb_user_username'] = user["username"] ?? '';
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('lb_user_email', email);
+  await prefs.setString('lb_user_name', user["name"] ?? '');
+  await prefs.setString('lb_user_id', user["_id"] ?? '');
+  await prefs.setString('lb_user_username', user["username"] ?? '');
 
   return data;
 }
 
-  /// Logout user by clearing local storage
+  /// Logout user by clearing storage
   static Future<void> logout() async {
-    html.window.localStorage.remove('lb_user_email');
-    html.window.localStorage.remove('lb_user_name');
-    html.window.localStorage.remove('lb_user_id');
-    html.window.localStorage.remove('lb_user_username');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('lb_user_email');
+    await prefs.remove('lb_user_name');
+    await prefs.remove('lb_user_id');
+    await prefs.remove('lb_user_username');
   }
 
   /// Request an OTP to be sent to the user's email.

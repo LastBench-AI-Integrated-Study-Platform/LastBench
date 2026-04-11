@@ -5,21 +5,21 @@ import 'services/auth_service.dart';
 import 'services/websocket_service.dart';
 import 'package:intl/intl.dart';
 
-class PersonalChatPage extends StatefulWidget {
-  final String partnerName;
-  final String partnerEmail;
+class GroupChatPage extends StatefulWidget {
+  final String groupName;
+  final String groupId;
 
-  const PersonalChatPage({
+  const GroupChatPage({
     super.key,
-    required this.partnerName,
-    required this.partnerEmail,
+    required this.groupName,
+    required this.groupId,
   });
 
   @override
-  State<PersonalChatPage> createState() => _PersonalChatPageState();
+  State<GroupChatPage> createState() => _GroupChatPageState();
 }
 
-class _PersonalChatPageState extends State<PersonalChatPage> {
+class _GroupChatPageState extends State<GroupChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _messages = [];
@@ -53,7 +53,7 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
 
   Future<void> _fetchMessagesSilently() async {
     try {
-      final msgs = await ChatService.getPersonalMessages(widget.partnerEmail);
+      final msgs = await ChatService.getGroupMessages(widget.groupId);
       if (mounted) {
         final shouldScroll = msgs.length > _messages.length;
         setState(() {
@@ -70,7 +70,7 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
 
   Future<void> _fetchMessages() async {
     try {
-      final msgs = await ChatService.getPersonalMessages(widget.partnerEmail);
+      final msgs = await ChatService.getGroupMessages(widget.groupId);
       if (mounted) {
         setState(() {
           _messages = msgs;
@@ -151,7 +151,7 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
     _scrollToBottom();
 
     try {
-      await ChatService.sendPersonalMessage(widget.partnerEmail, text);
+      await ChatService.sendGroupMessage(widget.groupId, text);
     // Optionally fetch messages again to sync with DB id/timestamp
     // _fetchMessages();
     } catch (e) {
@@ -271,13 +271,13 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
               radius: 18,
               backgroundColor: teal,
               child: Text(
-                widget.partnerName.isNotEmpty ? widget.partnerName[0].toUpperCase() : '?',
+                widget.groupName.isNotEmpty ? widget.groupName[0].toUpperCase() : '?',
                 style: const TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
             const SizedBox(width: 12),
             Text(
-              widget.partnerName,
+              widget.groupName,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.normal,color: Colors.white),
             ),
           ],
@@ -302,7 +302,7 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              "Say Hello to ${widget.partnerName}!",
+                              "Say Hello to ${widget.groupName}!",
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -355,7 +355,13 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
 
                           Widget messageBubble = GestureDetector(
                             onLongPress: isMe ? () => _showMessageOptions(msg['id'], msg['content']) : null,
-                            child: _buildMessageBubble(msg['content'] ?? '', msg['timestamp'] ?? '', isMe, isEdited),
+                            child: _buildMessageBubble(
+                              msg['content'] ?? '',
+                              msg['timestamp'] ?? '',
+                              isMe,
+                              isEdited,
+                              msg['sender_name'] ?? msg['sender_email'] ?? 'Unknown'
+                            ),
                           );
 
                           if (showDateSeparator && currentDateTime != null) {
@@ -377,7 +383,7 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
     );
   }
 
-  Widget _buildMessageBubble(String content, String timestamp, bool isMe, bool isEdited) {
+  Widget _buildMessageBubble(String content, String timestamp, bool isMe, bool isEdited, String senderName) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -406,6 +412,18 @@ class _PersonalChatPageState extends State<PersonalChatPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (!isMe)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: Text(
+                  senderName,
+                  style: TextStyle(
+                    color: primaryDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             Text(
               content,
               style: TextStyle(

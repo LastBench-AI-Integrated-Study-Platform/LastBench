@@ -8,7 +8,12 @@ import 'deadline_provider.dart';
 import 'widgets/call_manager.dart';
 import 'landing_page.dart';
 
-void main() {
+import 'services/auth_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Warm up the AuthService cache
+  await AuthService.getUserEmail();
   runApp(const LastBenchApp());
 }
 

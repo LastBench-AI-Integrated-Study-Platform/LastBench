@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config.dart';
 
 class ProfileService {
-  static const String baseUrl = "http://127.0.0.1:8000";
+  static String get baseUrl => AppConfig.apiBaseUrl;
 
   static Future<Map<String, dynamic>> getProfile(String email) async {
     final uri = Uri.parse('$baseUrl/auth/profile?email=$email');

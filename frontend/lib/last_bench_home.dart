@@ -40,8 +40,8 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   // Profile state
   String? _profileImageBase64;
 
-  String? get currentEmail => widget.userEmail ?? AuthService.getUserEmail();
-  String? get currentUserName => widget.userName ?? AuthService.getUserName();
+  String? get currentEmail => widget.userEmail ?? AuthService.currentUserEmail;
+  String? get currentUserName => widget.userName ?? AuthService.currentUserName;
 
   @override
   void initState() {

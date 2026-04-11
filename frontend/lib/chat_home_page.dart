@@ -852,72 +852,74 @@ class _SearchUserSheetState extends State<_SearchUserSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        top: 20,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF1F4),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              autofocus: true,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search, color: Colors.grey, size: 22),
-                hintText: "Search by username...",
-                border: InputBorder.none,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: 20,
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF1F4),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search, color: Colors.grey, size: 22),
+                  hintText: "Search by username...",
+                  border: InputBorder.none,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          if (_isSearching)
-            const Center(child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ))
-          else if (_searchResults.isEmpty && _searchController.text.trim().isNotEmpty)
-            const Center(
-              child: Padding(
+            const SizedBox(height: 16),
+            if (_isSearching)
+              const Center(child: Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text("No users found", style: TextStyle(color: Colors.grey)),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _searchResults.length,
-              separatorBuilder: (_, __) => const Divider(),
-              itemBuilder: (context, index) {
-                final user = _searchResults[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: const Color(0xFF3F8F8B),
-                    child: Text(
-                      user["name"][0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                child: CircularProgressIndicator(),
+              ))
+            else if (_searchResults.isEmpty && _searchController.text.trim().isNotEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text("No users found", style: TextStyle(color: Colors.grey)),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _searchResults.length,
+                separatorBuilder: (_, __) => const Divider(),
+                itemBuilder: (context, index) {
+                  final user = _searchResults[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF3F8F8B),
+                      child: Text(
+                        user["name"][0].toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ),
-                  title: Text(user["name"], style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(user["email"], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    widget.onUserSelected(user);
-                  },
-                );
-              },
-            ),
-        ],
+                    title: Text(user["name"], style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(user["email"], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      widget.onUserSelected(user);
+                    },
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
