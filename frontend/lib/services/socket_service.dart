@@ -14,7 +14,7 @@ class SocketService {
 
   void connect(String userId, {String? serverUrl}) {
     if (_connected) return;
-    final url = 'http://127.0.0.1:8000';
+    final url = serverUrl ?? 'http://192.168.0.116:8000';
 
     _socket = IO.io(
       url,
@@ -110,7 +110,7 @@ class SocketService {
   }
 
   void offAll() {
-    _socket?.off('call_incoming');
+    // Keep 'call_incoming' so we can receive future calls!
     _socket?.off('call_accepted');
     _socket?.off('call_rejected');
     _socket?.off('call_ringing');

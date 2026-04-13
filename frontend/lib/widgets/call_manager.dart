@@ -3,7 +3,7 @@
 // globally and shows IncomingCallPage on top of whatever screen is open.
 
 import 'package:flutter/material.dart';
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 import '../services/socket_service.dart';
 import '../services/user_session.dart';
 import '../pages/incoming_call_page.dart';

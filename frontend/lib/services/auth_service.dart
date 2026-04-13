@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:universal_html/html.dart' as html;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
