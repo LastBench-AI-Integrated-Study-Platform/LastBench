@@ -176,7 +176,7 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
   Future<void> _loadCurrentUserAndHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      currentUserEmail = prefs.getString('user_email');
+      currentUserEmail = prefs.getString('lb_user_email');
     } catch (_) {}
 
     await loadSessionsHistory();
@@ -198,7 +198,7 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${AppConfig.uploadEndpoint}${AppConfig.generationParams}'),
+        Uri.parse('${AppConfig.apiBaseUrl}/file'),
       );
 
       request.files.add(
@@ -223,7 +223,7 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
         final data = jsonDecode(responseBody);
 
         // Store extracted text
-        final fullExtractedText = data['extracted_text'] ?? '';
+        final fullExtractedText = data['text'] ?? '';
 
         if (mounted) {
           setState(() {
@@ -378,13 +378,13 @@ class _UploadFileScreenState extends State<UploadFileScreen> {
                           _buildStatItem(
                             Icons.quiz,
                             'Questions',
-                            data['quiz']['total_questions'].toString(),
+                            '10',
                             Colors.orange,
                           ),
                           _buildStatItem(
                             Icons.style,
                             'Flashcards',
-                            data['flashcards']['total_cards'].toString(),
+                            '10',
                             Colors.purple,
                           ),
                         ],

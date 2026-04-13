@@ -315,11 +315,13 @@ def get_sessions_history(email: Optional[str] = Query(None)):
     """Retrieve quiz sessions with their creation time for history view.
     If an email query parameter is provided, only return sessions created by that user."""
     try:
-        # Build pipeline with optional filtering by user email
-        pipeline = []
+        if not email:
+            print("⚠️ No email provided to history endpoint. Returning empty list.")
+            return {"sessions": [], "total": 0}
 
-        if email:
-            pipeline.append({"$match": {"user_email": email}})
+        pipeline = [
+            {"$match": {"user_email": email}}
+        ]
 
         pipeline.extend([
             {
@@ -369,8 +371,12 @@ def get_session_full_details(session_id: str, email: Optional[str] = Query(None)
         if not quiz_session:
             raise HTTPException(status_code=404, detail="Session not found")
 
+        # Ensure email is provided for authorization
+        if not email:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
         # If email filter provided, enforce ownership
-        if email and quiz_session.get("user_email") != email:
+        if quiz_session.get("user_email") != email:
             raise HTTPException(status_code=403, detail="Forbidden: access denied")
         
         # Remove MongoDB's _id field
