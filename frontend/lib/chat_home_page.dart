@@ -549,22 +549,30 @@ class _ChatHomePageState extends State<ChatHomePage> {
           ),
           const SizedBox(height: 6),
           GestureDetector(
-  onTap: () {
-    _showMembersDialog(groupId);
-  },
-  child: Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      const Icon(Icons.group_outlined,
-          size: 16, color: Color(0xFF3F8F8B)),
-      const SizedBox(width: 6),
-      Text(
-        "$active members",
-        style: const TextStyle(color: Color(0xFF3F8F8B)),
-      ),
-    ],
-  ),
-),
+            onTap: () {
+              _showMembersDialog(groupId);
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.group_outlined, size: 16, color: Color(0xFF3F8F8B)),
+                const SizedBox(width: 6),
+                Text(
+                  "$active members",
+                  style: const TextStyle(color: Color(0xFF3F8F8B)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "ID: $groupId",
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[400],
+              fontFamily: 'monospace',
+            ),
+          ),
         ],
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'services/chat_service.dart';
 import 'services/auth_service.dart';
@@ -98,6 +99,70 @@ class _GroupChatPageState extends State<GroupChatPage> {
         );
       }
     });
+  }
+
+  void _showGroupInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: teal),
+            const SizedBox(width: 8),
+            const Text("Group Info"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Group Name:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+            Text(widget.groupName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryDark)),
+            const SizedBox(height: 16),
+            const Text("Group ID:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.groupId,
+                      style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.copy, size: 20, color: teal),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: widget.groupId));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Group ID copied to clipboard!")),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Share this ID with others so they can join this group from the 'Join Group' menu.",
+              style: TextStyle(fontSize: 12, color: Colors.black54, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Close", style: TextStyle(color: primaryDark)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _sendMessage() async {
@@ -284,6 +349,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
         ),
         backgroundColor: primaryDark,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline, color: Colors.white),
+            onPressed: _showGroupInfoDialog,
+            tooltip: "Group Info",
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
