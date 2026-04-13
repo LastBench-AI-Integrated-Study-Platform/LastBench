@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'config.dart';
 
 class DailyInsightsCard extends StatefulWidget {
   const DailyInsightsCard({super.key});
@@ -20,7 +21,7 @@ class _DailyInsightsCardState extends State<DailyInsightsCard> {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://127.0.0.1:8000/insights/daily");
+      final url = Uri.parse("${AppConfig.apiBaseUrl}/insights/daily");
       final res = await http.get(url);
 
       if (res.statusCode == 200) {

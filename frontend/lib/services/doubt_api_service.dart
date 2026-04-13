@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../config.dart';
 
 // Models
 class DoubtApiModel {
@@ -136,7 +137,7 @@ class ReplyApiModel {
 
 // API Service
 class DoubtApiService {
-  static const String baseUrl = 'http://localhost:8000/doubts';
+  static String get baseUrl => "${AppConfig.apiBaseUrl}/doubts";
   static const Duration timeout = Duration(seconds: 30);
 
   // ============================================================================

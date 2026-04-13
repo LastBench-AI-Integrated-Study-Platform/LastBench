@@ -115,7 +115,8 @@ class _UploadScreenState extends State<UploadScreen> {
     }
 
     if (response.statusCode != 200) {
-      throw Exception("Server error: ${response.statusCode} – ${response.body.substring(0, 200)}...");
+      final msg = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+      throw Exception("Server error: ${response.statusCode} – $msg...");
     }
 
     // ── Safe JSON parsing ────────────────────────────────────────────────

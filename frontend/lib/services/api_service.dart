@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config.dart';
 
 class ApiService {
-  // FastAPI runs on 8000, Socket server on 5001
-  static const String baseUrl = 'http://192.168.0.116:8000';
+  static String get baseUrl => AppConfig.apiBaseUrl;
   static Future<List<UserModel>> searchUsers(
     String query,
     String currentUserId,

@@ -311,9 +311,24 @@ async def get_current_streak(email: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
+    # Check for streak break
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    last_study_date = user.get("last_study_date")
+    current_streak = user.get("current_streak", 0)
+    
+    if last_study_date and last_study_date != today_str and last_study_date != yesterday_str:
+        # Missed more than 1 day, reset streak
+        current_streak = 0
+        db.users.update_one(
+            {"email": email},
+            {"$set": {"current_streak": 0}}
+        )
+        
     return {
-        "current_streak": user.get("current_streak", 0),
-        "last_study_date": user.get("last_study_date"),
+        "current_streak": current_streak,
+        "last_study_date": last_study_date,
         "study_dates": user.get("study_dates", [])
     }
 

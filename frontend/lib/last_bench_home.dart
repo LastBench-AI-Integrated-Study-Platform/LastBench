@@ -7,12 +7,14 @@ import 'ask_from_pdf_page.dart';
 import 'daily_insights_card.dart';
 import 'upload_file_page.dart';
 import 'deadline_tracker_page.dart';
-import 'pages/call_contacts_page.dart';import 'chat_home_page.dart';
+import 'pages/call_contacts_page.dart';
+import 'chat_home_page.dart';
 import 'doubt_section.dart';
 import 'login_page.dart';
 import 'profile_creation_page.dart';
 import 'services/streak_service.dart';
 import 'services/auth_service.dart';
+import 'widgets/streak_calendar_dialog.dart';
 
 class LastBenchHome extends StatefulWidget {
   final String? userName;
@@ -38,9 +40,10 @@ class _LastBenchHomeState extends State<LastBenchHome> {
 
   // Profile state
   String? _profileImageBase64;
+  List<String> _studyDates = [];
 
-  String? get currentEmail => widget.userEmail ?? AuthService.getUserEmail();
-  String? get currentUserName => widget.userName ?? AuthService.getUserName();
+  String? get currentEmail => widget.userEmail ?? AuthService.currentUserEmail;
+  String? get currentUserName => widget.userName ?? AuthService.currentUserName;
 
   @override
   void initState() {
@@ -61,6 +64,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       );
       setState(() {
         _currentStreak = streakData['current_streak'] ?? 0;
+        _studyDates = List<String>.from(streakData['study_dates'] ?? []);
         _isStreakLoading = false;
       });
     } catch (e) {
@@ -83,6 +87,7 @@ class _LastBenchHomeState extends State<LastBenchHome> {
       final streakData = await StreakService.updateStreak(currentEmail!);
       setState(() {
         _currentStreak = streakData['current_streak'] ?? 0;
+        _studyDates = List<String>.from(streakData['study_dates'] ?? []);
       });
     } catch (e) {
       print('Error updating streak: $e');
@@ -111,12 +116,21 @@ class _LastBenchHomeState extends State<LastBenchHome> {
   }
 
   Widget _buildProfileIcon() {
-    if (_profileImageBase64 != null) {
-      final bytes = base64Decode(_profileImageBase64!);
-      return CircleAvatar(
-        radius: 20,
-        backgroundImage: MemoryImage(Uint8List.fromList(bytes)),
-      );
+    if (_profileImageBase64 != null && _profileImageBase64!.isNotEmpty) {
+      try {
+        // Handle data URI prefixes if accidentally stored
+        String base64Str = _profileImageBase64!;
+        if (base64Str.contains(',')) {
+          base64Str = base64Str.split(',').last;
+        }
+        final bytes = base64Decode(base64Str);
+        return CircleAvatar(
+          radius: 20,
+          backgroundImage: MemoryImage(Uint8List.fromList(bytes)),
+        );
+      } catch (e) {
+        return const Icon(Icons.account_circle, color: Colors.white, size: 32);
+      }
     } else {
       return const Icon(Icons.account_circle, color: Colors.white, size: 32);
     }
@@ -231,42 +245,55 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                         style: TextStyle(color: Colors.white70, fontSize: 16),
                       ),
                       const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.local_fire_department,
-                              color: Colors.orange,
-                            ),
-                            const SizedBox(width: 6),
-                            _isStreakLoading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                      GestureDetector(
+                        onTap: () {
+                          if (!_isStreakLoading) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => StreakCalendarDialog(
+                                studyDates: _studyDates,
+                                currentStreak: _currentStreak,
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.local_fire_department,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 6),
+                              _isStreakLoading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
                                       ),
+                                    )
+                                  : Text(
+                                      _currentStreak == 0
+                                          ? "Start your streak!"
+                                          : "${_currentStreak}-day study streak",
+                                      style: const TextStyle(color: Colors.white),
                                     ),
-                                  )
-                                : Text(
-                                    _currentStreak == 0
-                                        ? "Start your streak!"
-                                        : "${_currentStreak}-day study streak",
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -274,48 +301,58 @@ class _LastBenchHomeState extends State<LastBenchHome> {
                   Positioned(
                     top: 0,
                     right: 0,
-                    child: PopupMenuButton<String>(
-                      onSelected: (String value) {
-                        if (value == 'create_profile') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ProfileCreationPage(
-                                userEmail: currentEmail,
-                              ),
-                            ),
-                          ).then((_) => _loadProfileImage());
-                        } else if (value == 'view_edit_profile') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ProfileCreationPage(
-                                userEmail: currentEmail,
-                                isEditing: true,
-                              ),
-                            ),
-                          ).then((_) => _loadProfileImage());
-                        } else if (value == 'logout') {
-                          // Clear user data and navigate to login
-                          _logout();
-                        }
-                      },
-                      itemBuilder: (BuildContext context) =>
-                          <PopupMenuEntry<String>>[
-                            const PopupMenuItem<String>(
-                              value: 'create_profile',
-                              child: Text('Create Profile'),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'view_edit_profile',
-                              child: Text('View and Edit Profile'),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'logout',
-                              child: Text('Logout'),
-                            ),
-                          ],
-                      icon: _buildProfileIcon(),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PopupMenuButton<String>(
+                          onSelected: (String value) {
+                            if (value == 'create_profile') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProfileCreationPage(
+                                    userEmail: currentEmail,
+                                  ),
+                                ),
+                              ).then((_) => _loadProfileImage());
+                            } else if (value == 'view_edit_profile') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProfileCreationPage(
+                                    userEmail: currentEmail,
+                                    isEditing: true,
+                                  ),
+                                ),
+                              ).then((_) => _loadProfileImage());
+                            } else if (value == 'logout') {
+                              // Clear user data and navigate to login
+                              _logout();
+                            }
+                          },
+                          itemBuilder: (BuildContext context) =>
+                              <PopupMenuEntry<String>>[
+                                const PopupMenuItem<String>(
+                                  value: 'create_profile',
+                                  child: Text('Create Profile'),
+                                ),
+                                const PopupMenuItem<String>(
+                                  value: 'view_edit_profile',
+                                  child: Text('View and Edit Profile'),
+                                ),
+                                const PopupMenuItem<String>(
+                                  value: 'logout',
+                                  child: Text('Logout'),
+                                ),
+                              ],
+                          icon: _buildProfileIcon(),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.power_settings_new, color: Colors.white, size: 26),
+                          onPressed: _logout,
+                          tooltip: 'Logout',
+                        ),
+                      ],
                     ),
                   ),
                 ],

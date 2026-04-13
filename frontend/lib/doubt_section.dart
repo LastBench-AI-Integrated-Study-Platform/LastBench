@@ -64,7 +64,7 @@ Future<List<Uint8List>> pickImagesFromWeb() async {
 // ─── User helpers ───────────────────────────────────────────────────────────
 Future<String> _loadUserName() async {
   try {
-    return AuthService.getUserName() ?? 'You';
+    return AuthService.currentUserName ?? 'You';
   } catch (_) {
     return 'You';
   }
