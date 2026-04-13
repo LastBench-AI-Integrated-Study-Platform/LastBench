@@ -91,6 +91,11 @@ class AuthService {
   await prefs.setString('lb_user_name', user["name"] ?? '');
   await prefs.setString('lb_user_id', user["_id"] ?? '');
   await prefs.setString('lb_user_username', user["username"] ?? '');
+  if (user["profile_image_base64"] != null && user["profile_image_base64"].toString().isNotEmpty) {
+    await prefs.setString('profile_image_base64', user["profile_image_base64"]);
+  } else {
+    await prefs.remove('profile_image_base64');
+  }
 
   return data;
 }
@@ -98,10 +103,7 @@ class AuthService {
   /// Logout user by clearing storage
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('lb_user_email');
-    await prefs.remove('lb_user_name');
-    await prefs.remove('lb_user_id');
-    await prefs.remove('lb_user_username');
+    await prefs.clear(); // Clear all prefs reliably
   }
 
   /// Request an OTP to be sent to the user's email.

@@ -45,10 +45,10 @@ app.add_middleware(
 )
 
 # ✅ Include routers
-app.include_router(auth_router)
-app.include_router(insights_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(insights_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
-app.include_router(doubt_router)
+app.include_router(doubt_router, prefix="/api")
 app.include_router(combined_routes.router, prefix="/api")
 
 # ✅ Serve uploaded files as static assets
@@ -70,7 +70,7 @@ async def serve_uploaded_file(file_path: str):
     raise HTTPException(status_code=404, detail="File not found")
 
 app.include_router(deadline_router)
-app.include_router(call_router)
+app.include_router(call_router, prefix="/api")
 
 # ✅ Mount Socket.IO on top of FastAPI — run with: uvicorn app:socket_app
 socket_app = _sio_module.ASGIApp(sio, app)
