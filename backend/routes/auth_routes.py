@@ -6,6 +6,7 @@ from typing import Optional
 from utils.security import hash_password, verify_password
 from db.connection import db
 from models.user_model import UserSignup, UserLogin, UserProfile
+from services.streak_service import get_user_streak_data, update_user_streak
 
 # Models for reset flow
 class ResetCreate(BaseModel):
@@ -307,75 +308,19 @@ def reset_password(req: ResetPasswordRequest):
 # ---------------------------------------------------------------------------
 @router.get("/streak/current")
 async def get_current_streak(email: str):
-    user = db.users.find_one({"email": email})
-    if not user:
+    # Fetching current streak now triggers an update if it's a new day
+    streak_info = get_user_streak_data(email, trigger_update=True)
+    if not streak_info:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    # Check for streak break
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    
-    last_study_date = user.get("last_study_date")
-    current_streak = user.get("current_streak", 0)
-    
-    if last_study_date and last_study_date != today_str and last_study_date != yesterday_str:
-        # Missed more than 1 day, reset streak
-        current_streak = 0
-        db.users.update_one(
-            {"email": email},
-            {"$set": {"current_streak": 0}}
-        )
-        
-    return {
-        "current_streak": current_streak,
-        "last_study_date": last_study_date,
-        "study_dates": user.get("study_dates", [])
-    }
+    return streak_info
 
 class StreakUpdateRequest(BaseModel):
     email: str
 
 @router.post("/streak/update")
-async def update_streak(req: StreakUpdateRequest):
-    user = db.users.find_one({"email": req.email})
-    if not user:
+async def update_streak_route(req: StreakUpdateRequest):
+    streak_info = update_user_streak(req.email)
+    if not streak_info:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    
-    current_streak = user.get("current_streak", 0)
-    last_study_date = user.get("last_study_date")
-    study_dates = user.get("study_dates", [])
-    
-    if last_study_date == today_str:
-        # Already studied today, no change
-        pass
-    elif last_study_date == yesterday_str:
-        # Studied yesterday, continue streak
-        current_streak += 1
-        last_study_date = today_str
-        if today_str not in study_dates:
-            study_dates.append(today_str)
-    else:
-        # Streak broken or new streak
-        current_streak = 1
-        last_study_date = today_str
-        if today_str not in study_dates:
-            study_dates.append(today_str)
-            
-    db.users.update_one(
-        {"email": req.email},
-        {"$set": {
-            "current_streak": current_streak,
-            "last_study_date": last_study_date,
-            "study_dates": study_dates
-        }}
-    )
-    
-    return {
-        "current_streak": current_streak,
-        "last_study_date": last_study_date,
-        "study_dates": study_dates
-    }
+    return streak_info
 
