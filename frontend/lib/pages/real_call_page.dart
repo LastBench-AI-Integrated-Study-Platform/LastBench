@@ -73,97 +73,126 @@ class _RealCallPageState extends State<RealCallPage>
 
   // ── Agora init ─────────────────────────────────────────────────────────────
   Future<void> _initAgora() async {
-    // 1. Web Fallback Check
-    if (kIsWeb) {
-      // Agora RTC Flutter plugin requires native setup. For web testing,
-      // we bypass the native engine crash and simulate a connected state.
-      setState(() {
-        _engineReady = true;
-        _remoteUid = 999; // Mock remote user
-      });
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() => _seconds++);
-      });
-      return;
-    }
-
     // 1. Permissions (Mobile only)
-    final perms = [Permission.microphone];
-    if (_isVideoMode) perms.add(Permission.camera);
-    await perms.request();
-
-    // 2. Get token from your FastAPI backend
-    final uid = UserSession().userId.hashCode.abs() % 100000;
-    final tokenRes = await ApiService.getAgoraToken(widget.channel, uid);
-
-    if (tokenRes == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not get call token. Is the server running?'),
-          ),
-        );
-        Navigator.pop(context);
-      }
-      return;
+    if (!kIsWeb) {
+      final perms = [Permission.microphone];
+      if (_isVideoMode) perms.add(Permission.camera);
+      await perms.request();
     }
 
-    // 3. Create engine
-    _engine = createAgoraRtcEngine();
-    await _engine.initialize(
-      RtcEngineContext(
-        appId: tokenRes.appId,
-        channelProfile: ChannelProfileType.channelProfileCommunication,
-      ),
-    );
+    try {
+      // 2. Get token from your FastAPI backend
+      // On web we add a timestamp offset to ensure hot restarts or duplicate tabs NEVER cause "Already in channel" rejection.
+      final baseUid = UserSession().userId.hashCode.abs();
+      final uid = kIsWeb ? (baseUid + DateTime.now().millisecondsSinceEpoch).abs() % 100000 : baseUid % 100000;
+      final tokenRes = await ApiService.getAgoraToken(widget.channel, uid);
 
-    // 4. Events
-    _engine.registerEventHandler(
-      RtcEngineEventHandler(
-        onJoinChannelSuccess: (_, __) {
-          if (mounted) {
+      if (tokenRes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not get call token. Is the server running?'),
+            ),
+          );
+          Navigator.pop(context);
+        }
+        return;
+      }
+
+      // 3. Create engine
+      _engine = createAgoraRtcEngine();
+      await _engine.initialize(
+        RtcEngineContext(
+          appId: tokenRes.appId,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+        ),
+      );
+
+      // 4. Events
+      _engine.registerEventHandler(
+        RtcEngineEventHandler(
+          onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+            if (mounted) {
+              setState(() => _engineReady = true);
+              _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+                if (mounted) setState(() => _seconds++);
+              });
+            }
+          },
+          onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
+            if (mounted) setState(() => _remoteUid = remoteUid);
+          },
+          onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+            if (mounted) {
+              setState(() => _remoteUid = null);
+              _endCall(navigateBack: true);
+            }
+          },
+          onError: (ErrorCodeType err, String msg) {
+            debugPrint('Agora error $err: $msg');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Agora Platform Error: $msg ($err)')),
+              );
+            }
+          },
+        ),
+      );
+
+      // 5. Video / audio setup
+      debugPrint("Enabling Audio...");
+      await _engine.enableAudio();
+      
+      if (_isVideoMode) {
+        await _engine.enableVideo();
+        await _engine.startPreview();
+      } else {
+        await _engine.disableVideo();
+        if (!kIsWeb) {
+          await _engine.setEnableSpeakerphone(true);
+        }
+      }
+
+      // 6. Join channel
+      debugPrint("Joining Channel...");
+      await _engine.joinChannel(
+        token: tokenRes.token,
+        channelId: widget.channel,
+        uid: uid,
+        options: ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          publishCameraTrack: _isVideoMode,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: _isVideoMode,
+        ),
+      );
+      debugPrint("Join Channel Called");
+
+      if (kIsWeb) {
+        // Fallback for web if onJoinChannelSuccess doesn't fire as expected
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && !_engineReady) {
+            debugPrint("Firing Web fallback for engineReady");
             setState(() => _engineReady = true);
             _timer = Timer.periodic(const Duration(seconds: 1), (_) {
               if (mounted) setState(() => _seconds++);
             });
           }
-        },
-        onUserJoined: (_, uid, __) {
-          if (mounted) setState(() => _remoteUid = uid);
-        },
-        onUserOffline: (_, uid, __) {
-          if (mounted) {
-            setState(() => _remoteUid = null);
-            _endCall(navigateBack: true);
-          }
-        },
-        onError: (err, msg) => debugPrint('Agora error $err: $msg'),
-      ),
-    );
-
-    // 5. Video / audio setup
-    if (_isVideoMode) {
-      await _engine.enableVideo();
-      await _engine.startPreview();
-    } else {
-      await _engine.disableVideo();
-      await _engine.setEnableSpeakerphone(true);
+        });
+      }
+    } catch (e) {
+      debugPrint("AGORA INIT ERROR: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Initialization Error: $e'),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      }
     }
-
-    // 6. Join channel
-    await _engine.joinChannel(
-      token: tokenRes.token,
-      channelId: widget.channel,
-      uid: uid,
-      options: ChannelMediaOptions(
-        channelProfile: ChannelProfileType.channelProfileCommunication,
-        clientRoleType: ClientRoleType.clientRoleBroadcaster,
-        publishCameraTrack: _isVideoMode,
-        publishMicrophoneTrack: true,
-        autoSubscribeAudio: true,
-        autoSubscribeVideo: _isVideoMode,
-      ),
-    );
   }
 
   // ── Controls ───────────────────────────────────────────────────────────────
@@ -195,13 +224,11 @@ class _RealCallPageState extends State<RealCallPage>
   Future<void> _endCall({required bool navigateBack}) async {
     _timer?.cancel();
     SocketService().offAll();
-    if (!kIsWeb) {
-      try {
-        await _engine.leaveChannel();
-        await _engine.release();
-      } catch (_) {}
-    }
     if (navigateBack && mounted) Navigator.pop(context);
+    try {
+      await _engine.leaveChannel();
+      await _engine.release();
+    } catch (_) {}
   }
 
   @override
@@ -335,7 +362,7 @@ class _RealCallPageState extends State<RealCallPage>
     return Stack(
       children: [
         // Remote full-screen
-        (!kIsWeb && _remoteUid != null)
+        (_remoteUid != null)
             ? AgoraVideoView(
                 controller: VideoViewController.remote(
                   rtcEngine: _engine,
@@ -398,23 +425,12 @@ class _RealCallPageState extends State<RealCallPage>
                       ),
                     ),
                   )
-                : (kIsWeb
-                      ? Container(
-                          color: Colors.black87,
-                          child: const Center(
-                            child: Icon(
-                              Icons.videocam,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                        )
-                      : AgoraVideoView(
-                          controller: VideoViewController(
-                            rtcEngine: _engine,
-                            canvas: const VideoCanvas(uid: 0),
-                          ),
-                        )),
+                : AgoraVideoView(
+                    controller: VideoViewController(
+                      rtcEngine: _engine,
+                      canvas: const VideoCanvas(uid: 0),
+                    ),
+                  ),
           ),
         ),
 
@@ -443,9 +459,28 @@ class _RealCallPageState extends State<RealCallPage>
 
   // ── Audio layout ───────────────────────────────────────────────────────────
   Widget _buildAudioLayout() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return Stack(
+      children: [
+        // Hidden AgoraVideoView for remote audio playback on Web
+        if (kIsWeb && _remoteUid != null)
+          Opacity(
+            opacity: 0,
+            child: SizedBox(
+               width: 1,
+               height: 1,
+               child: AgoraVideoView(
+                 controller: VideoViewController.remote(
+                   rtcEngine: _engine,
+                   canvas: VideoCanvas(uid: _remoteUid!),
+                   connection: RtcConnection(channelId: widget.channel),
+                 ),
+               ),
+            ),
+          ),
+        
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircleAvatar(
             radius: 66,
@@ -503,6 +538,8 @@ class _RealCallPageState extends State<RealCallPage>
             ),
         ],
       ),
+    ),
+      ],
     );
   }
 

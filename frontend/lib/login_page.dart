@@ -15,6 +15,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -32,12 +33,7 @@ class _LoginPageState extends State<LoginPage> {
 
   void submitLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      isLoading = true;
-      error = null;
-    });
     setState(() {
       isLoading = true;
       error = null;
@@ -52,18 +48,22 @@ class _LoginPageState extends State<LoginPage> {
 
       if (context.mounted) {
         // ✅ tell DeadlineProvider to fetch from MongoDB now
-       // await context.read<DeadlineProvider>().loadFromServer();
+        await context.read<DeadlineProvider>().loadFromServer();
 
         // ✅ go to home
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
-      setState(() {
-        error = "Invalid email or password";
-      });
+      if (context.mounted) {
+        setState(() {
+          error = "Invalid email or password";
+        });
+      }
     }
 
-    setState(() => isLoading = false);
+    if (context.mounted) {
+      setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -212,15 +212,14 @@ class _LoginPageState extends State<LoginPage> {
                                       const BorderSide(color: teal),
                                 ),
                               ),
-                             validator: (value) {
+                              validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return "Email is required";
                                 }
-
-                                if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                                if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
+                                    .hasMatch(value)) {
                                   return "Enter a valid email";
                                 }
-
                                 return null;
                               },
                             ),
@@ -280,15 +279,43 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null || value.length < 6)
+                                if (value == null || value.length < 6) {
                                   return "Password must be at least 6 characters";
+                                }
                                 return null;
                               },
                             ),
 
                             const SizedBox(height: 14),
 
-                            
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: rememberMe,
+                                      activeColor: teal,
+                                      onChanged: (value) => setState(
+                                          () => rememberMe = value ?? false),
+                                    ),
+                                    const Text("Remember me"),
+                                  ],
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ForgotPasswordFlow(
+                                        onBack: () => Navigator.pop(context),
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text("Forgot password?",
+                                      style: TextStyle(color: teal)),
+                                ),
+                              ],
+                            ),
 
                             const SizedBox(height: 22),
 
@@ -325,6 +352,49 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                       ),
                               ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: Divider(
+                                        color: Colors.grey.shade300)),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 8),
+                                  child: Text("Or continue with",
+                                      style:
+                                          TextStyle(color: Colors.black54)),
+                                ),
+                                Expanded(
+                                    child: Divider(
+                                        color: Colors.grey.shade300)),
+                              ],
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {},
+                                    icon: const Icon(Icons.g_mobiledata,
+                                        color: navy),
+                                    label: const Text("Google"),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {},
+                                    icon: const Icon(Icons.code, color: navy),
+                                    label: const Text("GitHub"),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

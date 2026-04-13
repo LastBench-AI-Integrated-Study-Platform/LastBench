@@ -22,6 +22,21 @@ class LastBenchApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => DeadlineProvider(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Last Bench',
+        theme: ThemeData(primaryColor: const Color(0xFF033F63)),
+        initialRoute: '/login', // ✅ always start at login
+        routes: {
+          '/login': (context) => const LoginPage(),
+          '/signup': (context) => const SignupPage(),
+          '/home': (context) => CallManager(child: const LastBenchHome()),
+          '/deadline': (context) => const DeadlineTrackerPage(),
+          '/landing': (context) => const LandingPage(),
+        },
+      ),
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Last Bench',
