@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // FastAPI runs on 8000, Socket server on 5001
-  static const String baseUrl = 'http://localhost:8000';
+  static const String baseUrl = 'http://192.168.0.116:8000';
   static Future<List<UserModel>> searchUsers(
     String query,
     String currentUserId,

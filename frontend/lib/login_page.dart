@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-<<<<<<< Updated upstream
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-=======
->>>>>>> Stashed changes
 import '../services/auth_service.dart';
 import '../deadline_provider.dart';
 import 'last_bench_home.dart';
@@ -18,10 +15,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -30,33 +24,22 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
   String? error;
 
-<<<<<<< Updated upstream
-  static const Color navy = Color(0xFF033F63);
-  static const Color teal = Color(0xFF379392);
-=======
   // 🎨 Exact design colors
   static const Color navy = Color(0xFF0F2E3C);
   static const Color teal = Color(0xFF3A8D86);
   static const Color hintGrey = Color(0xFF9FB0B7);
   static const Color borderGrey = Color(0xFFE6ECEF);
   static const Color fieldBg = Color(0xFFFBFDFE);
->>>>>>> Stashed changes
 
   void submitLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      isLoading = true;
-      error = null;
-    });
     setState(() {
       isLoading = true;
       error = null;
     });
 
     try {
-<<<<<<< Updated upstream
       // ✅ login — AuthService now saves email to localStorage
       await AuthService.login(
         email: emailController.text.trim(),
@@ -70,26 +53,17 @@ class _LoginPageState extends State<LoginPage> {
         // ✅ go to home
         Navigator.pushReplacementNamed(context, '/home');
       }
-=======
-      await AuthService.login(
-        email: emailController.text,
-        password: passwordController.text,
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const LastBenchHome(),
-        ),
-      );
->>>>>>> Stashed changes
     } catch (e) {
-      setState(() {
-        error = "Invalid email or password";
-      });
+      if (context.mounted) {
+        setState(() {
+          error = "Invalid email or password";
+        });
+      }
     }
 
-    setState(() => isLoading = false);
+    if (context.mounted) {
+      setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -109,36 +83,6 @@ class _LoginPageState extends State<LoginPage> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-<<<<<<< Updated upstream
-                TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/signup'),
-                  child: const Text(
-                    "New to Last Bench? Create an account",
-                    style: TextStyle(color: teal),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Center(
-                  child: Column(
-                    children: const [
-                      Text(
-                        "Welcome to Last Bench",
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: navy,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        "Sign in to continue your study journey",
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                    ],
-=======
                 const SizedBox(height: 30),
 
                 // 🔙 Back button
@@ -151,14 +95,11 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextButton.styleFrom(
                       foregroundColor: navy,
                     ),
->>>>>>> Stashed changes
                   ),
                 ),
 
                 const SizedBox(height: 30),
 
-<<<<<<< Updated upstream
-=======
                 // 🔹 Heading
                 RichText(
                   textAlign: TextAlign.center,
@@ -195,7 +136,6 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 36),
 
                 // 🔹 Login Card
->>>>>>> Stashed changes
                 Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 420),
@@ -231,25 +171,16 @@ class _LoginPageState extends State<LoginPage> {
                             const Text(
                               "Email Address",
                               style: TextStyle(
-<<<<<<< Updated upstream
-                                  fontWeight: FontWeight.bold, color: navy),
-=======
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: navy,
                               ),
->>>>>>> Stashed changes
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: emailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
-<<<<<<< Updated upstream
-                                prefixIcon:
-                                    const Icon(Icons.mail, color: navy),
-=======
->>>>>>> Stashed changes
                                 hintText: "yourname@example.com",
                                 hintStyle: const TextStyle(
                                   fontSize: 14,
@@ -282,16 +213,13 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty)
+                                if (value == null || value.isEmpty) {
                                   return "Email is required";
-<<<<<<< Updated upstream
-                                if (!value.contains("@"))
-=======
                                 }
                                 if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
                                     .hasMatch(value)) {
->>>>>>> Stashed changes
                                   return "Enter a valid email";
+                                }
                                 return null;
                               },
                             ),
@@ -301,24 +229,16 @@ class _LoginPageState extends State<LoginPage> {
                             const Text(
                               "Password",
                               style: TextStyle(
-<<<<<<< Updated upstream
-                                  fontWeight: FontWeight.bold, color: navy),
-=======
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: navy,
                               ),
->>>>>>> Stashed changes
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: passwordController,
                               obscureText: !showPassword,
                               decoration: InputDecoration(
-<<<<<<< Updated upstream
-                                prefixIcon:
-                                    const Icon(Icons.lock, color: navy),
-=======
                                 hintText: "Enter your password",
                                 hintStyle: const TextStyle(
                                   fontSize: 14,
@@ -329,7 +249,6 @@ class _LoginPageState extends State<LoginPage> {
                                   color: hintGrey,
                                   size: 20,
                                 ),
->>>>>>> Stashed changes
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     showPassword
@@ -360,15 +279,15 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null || value.length < 6)
+                                if (value == null || value.length < 6) {
                                   return "Password must be at least 6 characters";
+                                }
                                 return null;
                               },
                             ),
 
                             const SizedBox(height: 14),
 
-<<<<<<< Updated upstream
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -397,16 +316,10 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ],
                             ),
-=======
-                            
->>>>>>> Stashed changes
 
                             const SizedBox(height: 22),
 
-<<<<<<< Updated upstream
-=======
                             // Sign In Button
->>>>>>> Stashed changes
                             SizedBox(
                               width: double.infinity,
                               height: 52,
@@ -415,21 +328,9 @@ class _LoginPageState extends State<LoginPage> {
                                   backgroundColor: teal,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
-<<<<<<< Updated upstream
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: isLoading ? null : submitLogin,
-                                child: Text(
-                                  isLoading ? "Signing in..." : "Sign In",
-                                  style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold),
-=======
                                     borderRadius:
                                         BorderRadius.circular(14),
                                   ),
->>>>>>> Stashed changes
                                 ),
                                 onPressed:
                                     isLoading ? null : submitLogin,
@@ -452,7 +353,6 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                               ),
                             ),
-<<<<<<< Updated upstream
 
                             const SizedBox(height: 24),
 
@@ -496,8 +396,6 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ],
                             ),
-=======
->>>>>>> Stashed changes
                           ],
                         ),
                       ),
@@ -507,25 +405,6 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 28),
 
-<<<<<<< Updated upstream
-                Center(
-                  child: TextButton(
-                    onPressed: () => Navigator.pushNamed(context, '/signup'),
-                    child: const Text(
-                      "New to Last Bench? Create an account",
-                      style: TextStyle(color: teal),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                const Center(
-                  child: Text(
-                    "\"Back benchers welcome. Top ranks guaranteed.\"",
-                    style: TextStyle(
-                        fontStyle: FontStyle.italic, color: Colors.black45),
-=======
                 // Signup
                 TextButton(
                   onPressed: () {
@@ -537,7 +416,6 @@ class _LoginPageState extends State<LoginPage> {
                       fontSize: 14,
                       color: teal,
                     ),
->>>>>>> Stashed changes
                   ),
                 ),
 
